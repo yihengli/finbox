@@ -17,6 +17,9 @@ class EquityApiMode(Enum):
 
 
 def _validate_and_transform_dates(todate, fromdate):
+    """
+    Make sure the input dates are valid
+    """
 
     if isinstance(todate, str):
         todate = pd.to_datetime(todate).date()
@@ -30,7 +33,36 @@ def _validate_and_transform_dates(todate, fromdate):
 
 
 def get_history(ticker, todate=None, fromdate=None, freq='d', api_mode='yahoo',
-                proxies=None):
+                proxies=None, set_index=False):
+    """
+    Get the history prices over different equity assets from various data
+    vendors.
+
+    Parameters
+    ----------
+    ticker : str
+        Valid symbol such as `SPY` or `^VIX`
+    todate : str, optional
+        Format as `YYYY-MM-DD`, if not given, default to pull last 5 years
+    fromdate : str, optional
+        Format as `YYYY-MM-DD`, if not given, default to pull till today's data
+    freq : str, optional
+        Currently only supports 'd' (daily), '1wk' (weekly) and '1mo' (monthly)
+        (the default is 'd')
+    api_mode : str, optional
+        Currently only supports data from Yahoo (the default is 'yahoo')
+    proxies : dict{str: str}, optional
+        A dict indicating which proxy to go through for the download as in
+        {'http': 'http://myproxy.com'} or {'http': 'http://127.0.0.1:8080'}
+        (the default is None)
+    set_index : bool, optional
+        [description] (the default is False, which [default_description])
+
+    Returns
+    -------
+    pandas.DataFrame
+        Standard OHLCV table.
+    """
 
     if todate is None:
         todate = date.today()
@@ -41,10 +73,13 @@ def get_history(ticker, todate=None, fromdate=None, freq='d', api_mode='yahoo',
     todate, fromdate = _validate_and_transform_dates(todate, fromdate)
 
     if EquityApiMode(api_mode) == EquityApiMode('yahoo'):
-        return get_history_yahoo(ticker, todate, fromdate, freq, proxies)
+        return _get_history_yahoo(ticker, todate, fromdate, freq, proxies)
 
 
-def get_history_yahoo(ticker, todate, fromdate, freq, proxies):
+def _get_history_yahoo(ticker, todate, fromdate, freq, proxies):
+    """
+    Pull data from Yahoo v7 API
+    """
 
     urlhist = 'https://finance.yahoo.com/quote/{}/history'
     urldown = 'https://query1.finance.yahoo.com/v7/finance/download'
