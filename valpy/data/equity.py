@@ -73,7 +73,13 @@ def get_history(ticker, todate=None, fromdate=None, freq='d', api_mode='yahoo',
     todate, fromdate = _validate_and_transform_dates(todate, fromdate)
 
     if EquityApiMode(api_mode) == EquityApiMode('yahoo'):
-        return _get_history_yahoo(ticker, todate, fromdate, freq, proxies)
+        data = _get_history_yahoo(ticker, todate, fromdate, freq, proxies)
+
+    if set_index:
+        data.set_index("Date", inplace=True)
+        data.index = pd.to_datetime(data.index)
+
+    return data
 
 
 def _get_history_yahoo(ticker, todate, fromdate, freq, proxies):
