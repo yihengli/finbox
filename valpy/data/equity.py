@@ -4,12 +4,13 @@ A set of Python Client functions to get equity related data
 Yahoo related logics are credited to Backtrader.
 """
 
-import pandas as pd
-import requests
 import io
 from datetime import date
-from dateutil.relativedelta import relativedelta
 from enum import Enum
+
+import pandas as pd
+import requests
+from dateutil.relativedelta import relativedelta
 
 
 class EquityApiMode(Enum):

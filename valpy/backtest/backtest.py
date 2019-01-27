@@ -2,9 +2,15 @@ import backtrader as bt
 import pandas as pd
 
 from ..data.equity import get_history
+from .pyfolio import PyFolio
 
 
 class BacktestLogger(object):
+    """
+    A set of logger function that can replace the default backtrader's
+    behaviour to print out the detailed strategy execution information at
+    transaction basis. Normally for debuging purpose.
+    """
 
     @staticmethod
     def log(strategy, txt, dt=None):
@@ -59,7 +65,41 @@ class BacktestLogger(object):
 
 def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
                                  max_no_signal_days=1, coc=True,
-                                 initial_cash=100000, commission=0):
+                                 initial_cash=100000., commission=0.):
+    """
+    Given a specific ticker (currently only supports Equity) and a signal
+    (currently only support daily resolution) with -1, 0 and 1. The backtest
+    strategy will backtest based on simple long an short operations.
+
+    Parameters
+    ----------
+    ticker : str
+        An acceptable equity ticker such as 'SPY'
+    signal : pandas.DataFrame
+        One column dataframe with datetime index and -1, 0, 1 as value per cell
+    is_debug : bool, optional
+        Toggle Debugging mode (the default is False, which not print out any
+        transaction details)
+    leverage : int, optional
+        Leverage level for the strategy (the default is 1, which means no
+        leverage is applied)
+    max_no_signal_days : int, optional
+        The maximum days the strategy will hold its position when there is no
+        long / short signals (the default is 1, which means it will immediately
+        clear positions when no signal comes in)
+    coc : bool, optional
+        Cheat on Close Price Option (the default is True, which means the
+        backtest assumes you can always buy or sell at the close price per day)
+    initial_cash : float, optional
+        The initial capital when starting the strategy (the default is 100000)
+    commission : int, optional
+        [description] (the default is 0, which [default_description])
+
+    Returns
+    -------
+    [type]
+        [description]
+    """
 
     btlogger = BacktestLogger()
 
@@ -69,20 +109,6 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
             [(col, -1) for col in bt.feeds.PandasData.datafields[1:]
                 + ["signal"]])
         datafields = bt.feeds.PandasData.datafields[1:] + (["signal"])
-
-    def get_pandas_signal_feed(ticker, signal):
-        """ Get the pandas data feed with a signal column"""
-
-        signal.columns = ["signal"]
-        fromdate = signal.index.min().strftime('%Y-%m-%d')
-        todate = signal.index.max().strftime('%Y-%m-%d')
-
-        data = get_history(ticker, fromdate=fromdate,
-                           todate=todate, set_index=True)
-        data = pd.merge(data, signal, left_index=True,
-                        right_index=True, how="left").fillna(0)
-
-        return SignalPandasData(dataname=data)
 
     # Single Signal Strategy
     class SingleSignalStrategy(bt.Strategy):
@@ -127,15 +153,29 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
             else:
                 self.no_signal_hold_days += 1
 
+    def get_pandas_signal_feed(ticker, signal):
+        """ Get the pandas data feed with a signal column"""
+
+        signal.columns = ["signal"]
+        fromdate = signal.index.min().strftime('%Y-%m-%d')
+        todate = signal.index.max().strftime('%Y-%m-%d')
+
+        data = get_history(ticker, fromdate=fromdate,
+                           todate=todate, set_index=True)
+        data = pd.merge(data, signal, left_index=True,
+                        right_index=True, how="left").fillna(0)
+
+        return SignalPandasData(dataname=data)
+
     cerebro = bt.Cerebro()
     cerebro.addstrategy(SingleSignalStrategy)
 
     data = get_pandas_signal_feed(ticker, signal)
-    cerebro.adddata(data)
+    cerebro.adddata(data, name=ticker)
     cerebro.broker.setcash(initial_cash)
 
     cerebro.broker.set_coc(coc)
-    cerebro.addanalyzer(bt.analyzers.PyFolio)
+    cerebro.addanalyzer(PyFolio)
 
     cerebro.broker.setcommission(commission=commission, leverage=leverage)
 
