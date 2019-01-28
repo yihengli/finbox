@@ -14,6 +14,8 @@ setup(
     install_requires=[
         'backtrader',
         'pandas',
-        'requests'
+        'requests',
+        'pyecharts',
+        'pyfolio',
     ]
 )
