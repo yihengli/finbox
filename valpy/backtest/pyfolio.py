@@ -11,8 +11,8 @@ from backtrader.utils.py3 import iteritems
 from IPython.core.display import display, HTML
 
 import empyrical as ep
-from pyfolio import timeseries, utils
-from pyfolio.utils import APPROX_BDAYS_PER_MONTH, MM_DISPLAY_UNIT
+from pyfolio import timeseries
+from pyfolio.utils import APPROX_BDAYS_PER_MONTH
 
 STAT_FUNCS_PCT = [
     'Annual return',
@@ -145,7 +145,7 @@ class PyFolio(bt.Analyzer):
 def show_perf_stats(returns, factor_returns=None, positions=None,
                     transactions=None, turnover_denom='AGB',
                     live_start_date=None, bootstrap=False,
-                    header_rows=None, jupyter=False):
+                    header_rows=None, jupyter=False, pandas=False):
     """
     Prints some performance metrics of the strategy.
 
@@ -266,6 +266,9 @@ def show_perf_stats(returns, factor_returns=None, positions=None,
         table = pd.DataFrame(perf_stats)
     else:
         table = perf_stats
+
+    if pandas:
+        return table
 
     float_format = '{0:.2f}'.format
     header_rows = header_rows

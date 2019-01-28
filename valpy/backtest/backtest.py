@@ -64,7 +64,7 @@ class BacktestLogger(object):
 
 
 def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
-                                 max_no_signal_days=1, coc=True,
+                                 max_no_signal_days=1, coc=True, dataset=None,
                                  initial_cash=100000., commission=0.):
     """
     Given a specific ticker (currently only supports Equity) and a signal
@@ -74,7 +74,8 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
     Parameters
     ----------
     ticker : str
-        An acceptable equity ticker such as 'SPY'
+        An acceptable equity ticker such as 'SPY'. If `dataset` is provided
+        then this function will use given dataset
     signal : pandas.DataFrame
         One column dataframe with datetime index and -1, 0, 1 as value per cell
     is_debug : bool, optional
@@ -90,6 +91,8 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
     coc : bool, optional
         Cheat on Close Price Option (the default is True, which means the
         backtest assumes you can always buy or sell at the close price per day)
+    dataset : pandas.DataFrame
+        If provided, this function will use given dataset
     initial_cash : float, optional
         The initial capital when starting the strategy (the default is 100000)
     commission : int, optional
@@ -142,13 +145,13 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
                 self.log('+++ BUY SIGNAL TRIGGERED +++')
                 self.order_target_percent(target=.99)
                 self.no_signal_hold_days = 0
-            elif self.data.signal[0] <= 0:
+            elif self.data.signal[0] < 0:
                 self.log('--- SELL SIGNAL TRIGGERED ---')
                 self.order_target_percent(target=-.99)
                 self.no_signal_hold_days = 0
             elif self.no_signal_hold_days >= self.params.max_no_signal_days:
                 self.log('~~~ CLEARN POSITION ({} days no signals) ~~~'.format(
-                    self.hold_days_without_signal))
+                    self.no_signal_hold_days))
                 self.order_target_percent(target=0.)
             else:
                 self.no_signal_hold_days += 1
@@ -160,8 +163,11 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
         fromdate = signal.index.min().strftime('%Y-%m-%d')
         todate = signal.index.max().strftime('%Y-%m-%d')
 
-        data = get_history(ticker, fromdate=fromdate,
-                           todate=todate, set_index=True)
+        if dataset is None:
+            data = get_history(ticker, fromdate=fromdate,
+                               todate=todate, set_index=True)
+        else:
+            data = dataset
         data = pd.merge(data, signal, left_index=True,
                         right_index=True, how="left").fillna(0)
 
