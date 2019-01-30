@@ -191,13 +191,16 @@ def plot_interactive_rolling_sharpes(returns,
     attr = sharpe.index.strftime("%Y-%m-%d")
 
     line.add("Benchmark", attr, np.round(bench_sharpe, 3).tolist(),
-             is_datazoom_show=True,
+             is_datazoom_show=True, mark_line=["average"],
              datazoom_range=[(1 - valid_ratio) * 100, 100],
              **PlottingConfig.BENCH_KWARGS)
     line.add("Strategy", attr, np.round(sharpe, 3).tolist(),
-             **PlottingConfig.LINE_KWARGS)
+             mark_line=["average"], **PlottingConfig.LINE_KWARGS)
 
     line._option['color'][0] = 'grey'
     line._option['color'][1] = PlottingConfig.ORANGE
+
+    line._option["series"][0]["markLine"]["lineStyle"] = {"width": 1}
+    line._option["series"][1]["markLine"]["lineStyle"] = {"width": 2}
 
     return line
