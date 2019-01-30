@@ -63,9 +63,51 @@ class BacktestLogger(object):
                      (trade.pnl, trade.pnlcomm))
 
 
+def get_customized_pandasfeed(data, col_name, adjclose=True):
+    """
+    Based on Backtrader's default pandas datafeed, create a customized pandas
+    feed with an additional column which can be a predefined signal or
+    allocation weights.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Similar data table as Yahoo inputs, standard OLHCV etc.
+    col_name : str
+        The additional column's column name, will be used as the line name.
+    adjclose : bool, optional
+        Whether to use the dividend/split adjusted close and adjust all values
+        according to it.
+
+    Returns
+    -------
+    [type]
+        [description]
+    """
+    df = data.copy()
+
+    if adjclose:
+        adjfactor = df["Close"] / df["Adj Close"]
+        for col in ["Open", "High", "Low"]:
+            df[col] /= adjfactor
+
+        df["Close"] = df["Adj Close"]
+        df["Volume"] *= adjfactor
+
+    class CustomizedPandasData(bt.feeds.PandasData):
+        lines = tuple([col_name], )
+        params = (('datetime', None),) + tuple(
+            [(col, -1) for col in bt.feeds.PandasData.datafields[1:]
+                + [col_name]])
+        datafields = bt.feeds.PandasData.datafields[1:] + ([col_name])
+
+    return CustomizedPandasData(dataname=df)
+
+
 def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
                                  max_no_signal_days=1, coc=True, dataset=None,
-                                 initial_cash=100000., commission=0.):
+                                 initial_cash=100000., commission=0.,
+                                 adjclose=True):
     """
     Given a specific ticker (currently only supports Equity) and a signal
     (currently only support daily resolution) with -1, 0 and 1. The backtest
@@ -95,8 +137,11 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
         If provided, this function will use given dataset
     initial_cash : float, optional
         The initial capital when starting the strategy (the default is 100000)
-    commission : int, optional
-        [description] (the default is 0, which [default_description])
+    commission : float, optional
+        Currently only supports percentage based commisions settings.
+    adjclose : bool, optional
+        Whether to use the dividend/split adjusted close and adjust all values
+        according to it.
 
     Returns
     -------
@@ -106,12 +151,12 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
 
     btlogger = BacktestLogger()
 
-    class SignalPandasData(bt.feeds.PandasData):
-        lines = tuple(["signal"],)
-        params = (('datetime', None),) + tuple(
-            [(col, -1) for col in bt.feeds.PandasData.datafields[1:]
-                + ["signal"]])
-        datafields = bt.feeds.PandasData.datafields[1:] + (["signal"])
+    # class SignalPandasData(bt.feeds.PandasData):
+    #     lines = tuple(["signal"],)
+    #     params = (('datetime', None),) + tuple(
+    #         [(col, -1) for col in bt.feeds.PandasData.datafields[1:]
+    #             + ["signal"]])
+    #     datafields = bt.feeds.PandasData.datafields[1:] + (["signal"])
 
     # Single Signal Strategy
     class SingleSignalStrategy(bt.Strategy):
@@ -149,7 +194,8 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
                 self.log('--- SELL SIGNAL TRIGGERED ---')
                 self.order_target_percent(target=-.99)
                 self.no_signal_hold_days = 0
-            elif self.no_signal_hold_days >= self.params.max_no_signal_days:
+            elif self.no_signal_hold_days >= \
+                    self.params.max_no_signal_days - 1:
                 self.log('~~~ CLEARN POSITION ({} days no signals) ~~~'.format(
                     self.no_signal_hold_days))
                 self.order_target_percent(target=0.)
@@ -171,7 +217,7 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
         data = pd.merge(data, signal, left_index=True,
                         right_index=True, how="left").fillna(0)
 
-        return SignalPandasData(dataname=data)
+        return get_customized_pandasfeed(data, "signal")
 
     cerebro = bt.Cerebro()
     cerebro.addstrategy(SingleSignalStrategy)
