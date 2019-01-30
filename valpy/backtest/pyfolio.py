@@ -422,3 +422,24 @@ def get_rolling_returns(returns,
         'oos_cum_returns': oos_cum_returns,
         'cone_bounds': cone_bounds
     }
+
+
+def get_rolling_sharpe(returns, rolling_window=APPROX_BDAYS_PER_MONTH * 6):
+    """
+    Plots the rolling Sharpe ratio versus date.
+
+    Parameters
+    ----------
+    returns : pd.Series
+        Daily returns of the strategy, noncumulative.
+         - See full explanation in tears.create_full_tear_sheet.
+    rolling_window : int, optional
+        The days window over which to compute the sharpe ratio.
+
+    Returns
+    -------
+    pandas.Sieries
+        Rolling sharpe ratios
+    """
+    rolling_sharpe_ts = timeseries.rolling_sharpe(returns, rolling_window)
+    return rolling_sharpe_ts

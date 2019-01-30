@@ -1,5 +1,5 @@
 from pyecharts import Line
-from .pyfolio import get_rolling_returns
+from . import pyfolio as pf
 import numpy as np
 
 
@@ -89,7 +89,7 @@ def plot_interactive_rolling_returns(returns,
 
     def tooltip_format(params):
         def get_color(color):
-            return '<span style="display:inline-block;margin-right:5px;border-radius:10px;width:9px;height:9px;background-color:' + color + '"></span>' # noqa E501
+            return '<span style="display:inline-block;margin-right:5px;border-radius:10px;width:9px;height:9px;background-color:' + color + '"></span>'  # noqa E501
 
         res = params[0].axisValue
         for i in params:
@@ -101,9 +101,9 @@ def plot_interactive_rolling_returns(returns,
 
         return res
 
-    metrics = get_rolling_returns(returns, factor_returns=factor_returns,
-                                  live_start_date=live_start_date,
-                                  cone_std=cone_std)
+    metrics = pf.get_rolling_returns(returns, factor_returns=factor_returns,
+                                     live_start_date=live_start_date,
+                                     cone_std=cone_std)
 
     mini_list = [np.min(metrics['cum_factor_returns']),
                  np.min(metrics['is_cum_returns'])]
@@ -176,5 +176,28 @@ def plot_interactive_rolling_returns(returns,
     else:
         line._option['color'][2] = PlottingConfig.PINK_RED
         line._option['color'][3] = PlottingConfig.GREEN
+
+    return line
+
+
+def plot_interactive_rolling_sharpes(returns,
+                                     factor_returns):
+    line = Line("Rolling Sharpe Ratio (6 Months)")
+
+    sharpe = pf.get_rolling_sharpe(returns)
+    bench_sharpe = pf.get_rolling_sharpe(factor_returns)
+    valid_ratio = np.round(sharpe.count() / sharpe.shape[0], 3)
+
+    attr = sharpe.index.strftime("%Y-%m-%d")
+
+    line.add("Benchmark", attr, np.round(bench_sharpe, 3).tolist(),
+             is_datazoom_show=True,
+             datazoom_range=[(1 - valid_ratio) * 100, 100],
+             **PlottingConfig.BENCH_KWARGS)
+    line.add("Strategy", attr, np.round(sharpe, 3).tolist(),
+             **PlottingConfig.LINE_KWARGS)
+
+    line._option['color'][0] = 'grey'
+    line._option['color'][1] = PlottingConfig.ORANGE
 
     return line

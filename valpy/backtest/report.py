@@ -34,7 +34,8 @@ class ReportBuilder(object):
     <h2>Performance Table</h2>
     {table}
     <h2>Returns Analysis</h2>
-      <div id="rolling_cum_returns" style="width: 100%;height:500px;"></div>
+      
+      <div id="rolling_cum_returns" style="width: 100%;height:400px;"></div>
       <script type="text/javascript">
         var chartRCT = echarts.init(document.getElementById('rolling_cum_returns'));
         {rct_func}
@@ -42,7 +43,16 @@ class ReportBuilder(object):
         chartRCT.setOption(optionRCT);
         $(window).on('resize', function(){{
           if(chartRCT != null && chartRCT != undefined){{chartRCT.resize();}} }});
-    </script>
+      </script>
+      
+      <div id="rolling_cum_sharpes" style="width: 100%;height:400px;"></div>
+      <script type="text/javascript">
+        var chartRCS = echarts.init(document.getElementById('rolling_cum_sharpes'));
+        var optionRCS = {rcs_option};
+        chartRCS.setOption(optionRCS);
+        $(window).on('resize', function(){{
+          if(chartRCS != null && chartRCS != undefined){{chartRCS.resize();}} }});
+      </script>
   </div>
 </body>
 </html>
@@ -69,17 +79,20 @@ class ReportBuilder(object):
 
         if jupyter:
             display(self.get_interactive_rolling_returns(jupyter=jupyter))
+            display(self.get_interactive_rolling_sharpes(jupyter=jupyter))
 
         if dest is not None:
             rct_f, rct_o = self.get_interactive_rolling_returns(
                 jupyter=jupyter)
+            rcs_o = self.get_interactive_rolling_sharpes(jupyter=jupyter)
 
             with open(dest, 'w') as report:
                 report.write(self.template.format(
                     report_name=self.report_name,
                     table=table,
                     rct_func=rct_f,
-                    rct_option=rct_o))
+                    rct_option=rct_o,
+                    rcs_option=rcs_o))
 
     def get_performance_table(self, jupyter=True):
         return pyfolio.show_perf_stats(returns=self.returns,
@@ -112,3 +125,18 @@ class ReportBuilder(object):
             option_str = html_text[option_start + len(chart_id) + 3:option_end]
 
             return func_str, option_str
+
+    def get_interactive_rolling_sharpes(self, jupyter=True):
+        plot = plotting.plot_interactive_rolling_sharpes(
+            returns=self.returns, factor_returns=self.benchmark_rets)
+
+        if jupyter:
+            return plot
+        else:
+            html_text = plot._repr_html_()
+            chart_id = plot.chart_id
+            option_start = html_text.find(
+                '{} = {{\n    "title": '.format(chart_id))
+            option_end = html_text.find('\nmyChart_{}'.format(chart_id))
+            option_str = html_text[option_start + len(chart_id) + 3:option_end]
+            return option_str
