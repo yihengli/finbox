@@ -7,11 +7,28 @@ class Number:
     pass
 
 
-class PlottingColors:
+class PlottingConfig:
 
+    # Colors
     CI_AREA_COLOR = '#0082c8'
     GREEN = '#3cb44b'
     PINK_RED = '#e6194b'
+    ORANGE = '#f58231'
+
+    # Line Styles
+    LINE_KWARGS = {
+        "line_width": 3,
+        "line_opacity": 0.8,
+        "tooltip_trigger": "axis",
+        "is_symbol_show": False
+    }
+
+    BENCH_KWARGS = {
+        "line_width": 2,
+        "line_opacity": 0.8,
+        "tooltip_trigger": "axis",
+        "is_symbol_show": False
+    }
 
 
 def plot_interactive_rolling_returns(returns,
@@ -109,13 +126,13 @@ def plot_interactive_rolling_returns(returns,
     line = Line("Cumulative Returns")
 
     # Set Up Color Variables
-    area_color = PlottingColors.CI_AREA_COLOR
+    area_color = PlottingConfig.CI_AREA_COLOR
 
     # Add Benchmark Line
     line.add("Benchmark", attr,
              np.round(metrics['cum_factor_returns'], 4).tolist(),
-             tooltip_trigger='axis', is_datazoom_show=True, line_width=2,
-             line_opacity=0.8, datazoom_range=[0, 100])
+             is_datazoom_show=True, datazoom_range=[0, 100],
+             **PlottingConfig().BENCH_KWARGS)
     line._option['color'][0] = 'grey'
 
     # Add Confidence Interval
@@ -134,32 +151,30 @@ def plot_interactive_rolling_returns(returns,
     if metrics['oos_cum_returns'] is not None:
         line.add("Out Of Sample", attr,
                  np.round(metrics['oos_cum_returns'], 4).tolist(),
-                 tooltip_trigger='axis', line_width=3, line_opacity=0.8,
-                 is_symbol_show=False)
-        line._option['color'][2] = PlottingColors.PINK_RED
-        line._option['color'][3] = PlottingColors.GREEN
+                 **PlottingConfig().LINE_KWARGS)
+        line._option['color'][2] = PlottingConfig.PINK_RED
+        line._option['color'][3] = PlottingConfig.GREEN
     else:
-        line._option['color'][1] = PlottingColors.GREEN
+        line._option['color'][1] = PlottingConfig.GREEN
 
     # Add IS Line
     line.add("In Sample", attr,
              np.round(metrics['is_cum_returns'], 4).tolist(),
-             tooltip_trigger='axis', tooltip_formatter=tooltip_format,
-             yaxis_min=yaxis_min, line_width=3, line_opacity=0.8,
-             is_symbol_show=False)
+             tooltip_formatter=tooltip_format, yaxis_min=yaxis_min,
+             **PlottingConfig().LINE_KWARGS)
 
     line._option['legend'][0]['data'] = [
         'Benchmark', 'In Sample', 'Out Of Sample', 'CI']
 
     # Set up colors
     if metrics['oos_cum_returns'] is None:
-        line._option['color'][1] = PlottingColors.GREEN
+        line._option['color'][1] = PlottingConfig.GREEN
     elif metrics['oos_cum_returns'] is not None and \
             metrics['cone_bounds'] is None:
-        line._option['color'][1] = PlottingColors.PINK_RED
-        line._option['color'][2] = PlottingColors.GREEN
+        line._option['color'][1] = PlottingConfig.PINK_RED
+        line._option['color'][2] = PlottingConfig.GREEN
     else:
-        line._option['color'][2] = PlottingColors.PINK_RED
-        line._option['color'][3] = PlottingColors.GREEN
+        line._option['color'][2] = PlottingConfig.PINK_RED
+        line._option['color'][3] = PlottingConfig.GREEN
 
     return line
