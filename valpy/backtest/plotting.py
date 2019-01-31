@@ -1,6 +1,10 @@
-from pyecharts import Line
-from . import pyfolio as pf
+import warnings
 import numpy as np
+import pandas as pd
+import empyrical as ep
+from pyecharts import Grid, Line
+from . import pyfolio as pf
+from IPython.core.display import display, HTML
 
 
 class Number:
@@ -29,6 +33,35 @@ class PlottingConfig:
         "tooltip_trigger": "axis",
         "is_symbol_show": False
     }
+
+
+def print_table(table, float_format='{0:.2f}'.format, formatters=None,
+                jupyter=False, header_rows=None):
+    html = table.to_html(float_format=float_format, formatters=formatters)
+
+    if header_rows is not None:
+        # Count the number of columns for the text to span
+        n_cols = html.split('<thead>')[1].split('</thead>')[0].count('<th>')
+
+        # Generate the HTML for the extra rows
+        rows = ''
+        for name, value in header_rows.items():
+            rows += ('\n    <tr style="text-align: right;"><th>%s</th>' +
+                     '<td colspan=%d>%s</td></tr>') % (name, n_cols, value)
+
+        # Inject the new HTML
+        html = html.replace('<thead>', '<thead>' + rows)
+
+    if jupyter:
+        display(HTML(html))
+    else:
+        html = html.replace(
+            '<table border="1" class="dataframe">',
+            '<table class="table table-sm table-hover table-striped">'
+        )
+        html = html.replace(' style="text-align: right;', '')
+
+        return html
 
 
 def plot_interactive_rolling_returns(returns,
@@ -204,3 +237,63 @@ def plot_interactive_rolling_sharpes(returns,
     line._option["series"][1]["markLine"]["lineStyle"] = {"width": 2}
 
     return line
+
+
+def plot_interactive_drawdown_underwater(returns, top=5):
+    """
+    Plots how far underwaterr returns are over time, or plots current
+    drawdown vs. date.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        df_cum_rets = ep.cum_returns(returns, starting_value=1.0)
+        df_drawdowns = pf.timeseries.gen_drawdown_table(returns, top=top)
+        running_max = np.maximum.accumulate(df_cum_rets)
+        underwater = -100 * ((running_max - df_cum_rets) / running_max)
+
+    line = Line("Top 5 Drawdowns")
+    attr = df_cum_rets.index.strftime("%Y-%m-%d")
+
+    line.add("Cumulative Returns", attr, np.round(df_cum_rets, 3).tolist(),
+             line_color='#fff', is_datazoom_show=True, datazoom_range=[0, 100],
+             yaxis_min=0.7, datazoom_xaxis_index=[0, 1],
+             **PlottingConfig.BENCH_KWARGS)
+
+    line._option["color"][0] = PlottingConfig.ORANGE
+    line._option["series"][0]["markArea"] = {"data": []}
+
+    color_sets = ['#355C7D', '#6C5B7B', '#C06C84', '#F67280', '#F8B195']
+    for i, (peak, recovery) in df_drawdowns[
+            ['Peak date', 'Recovery date']].iterrows():
+        if pd.isnull(recovery):
+            recovery = returns.index[-1]
+        peak = peak.strftime("%Y-%m-%d")
+        recovery = recovery.strftime("%Y-%m-%d")
+
+        line._option["series"][0]["markArea"]["data"].append(
+            [{
+                "name": str(i+1),
+                "xAxis": peak,
+                "itemStyle": {
+                    "opacity": 0.9,
+                    "color": color_sets[i]
+                }
+            }, {
+                "xAxis": recovery
+            }]
+        )
+
+    line2 = Line("Underwater Plot", title_top="50%")
+    line2.add("DrawDown", attr, np.round(underwater, 3).tolist(),
+              is_datazoom_show=True, area_color=PlottingConfig.ORANGE,
+              yaxis_formatter='%', area_opacity=0.5, datazoom_range=[0, 100],
+              legend_top="50%", **PlottingConfig.BENCH_KWARGS)
+
+    grid = Grid()
+    grid.add(line, grid_bottom="57%")
+    grid.add(line2, grid_top="57%")
+
+    grid._option["color"][1] = PlottingConfig.ORANGE
+    grid._option["axisPointer"] = {"link": {"xAxisIndex": 'all'}}
+
+    return grid

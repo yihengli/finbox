@@ -8,11 +8,12 @@ from backtrader.analyzers.positions import PositionsValue
 from backtrader.analyzers.timereturn import TimeReturn
 from backtrader.analyzers.transactions import Transactions
 from backtrader.utils.py3 import iteritems
-from IPython.core.display import display, HTML
 
 import empyrical as ep
+import warnings
 from pyfolio import timeseries
 from pyfolio.utils import APPROX_BDAYS_PER_MONTH
+from .plotting import print_table
 
 STAT_FUNCS_PCT = [
     'Annual return',
@@ -140,6 +141,17 @@ class PyFolio(bt.Analyzer):
 
         # Return all together
         return rets, positions, transactions, glev
+
+
+def show_worst_drawdown_table(returns, top=5, jupyter=False, pandas=True):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        table = timeseries.gen_drawdown_table(returns, top=top)
+
+    if pandas:
+        return table
+
+    return print_table(table, jupyter=jupyter)
 
 
 def show_perf_stats(returns, factor_returns=None, positions=None,
@@ -270,44 +282,12 @@ def show_perf_stats(returns, factor_returns=None, positions=None,
     if pandas:
         return table
 
-    float_format = '{0:.2f}'.format
-    header_rows = header_rows
     name = None
-    formatters = None
 
     if name is not None:
         table.columns.name = name
 
-    html = table.to_html(float_format=float_format, formatters=formatters)
-
-    if header_rows is not None:
-        # Count the number of columns for the text to span
-        n_cols = html.split('<thead>')[1].split('</thead>')[0].count('<th>')
-
-        # Generate the HTML for the extra rows
-        rows = ''
-        for name, value in header_rows.items():
-            rows += ('\n    <tr style="text-align: right;"><th>%s</th>' +
-                     '<td colspan=%d>%s</td></tr>') % (name, n_cols, value)
-
-        # Inject the new HTML
-        html = html.replace('<thead>', '<thead>' + rows)
-
-    if jupyter:
-        display(HTML(html))
-    else:
-        html = html.replace(
-            '<table border="1" class="dataframe">',
-            '<table class="table table-sm table-hover table-striped">'
-        )
-        html = html.replace(
-            '<tr style="text-align: right;">\n      <th></th>\n      '
-            '<th>All</th>\n      <th>In-sample</th>\n      '
-            '<th>Out-of-sample</th>\n',
-            '<tr>\n      <th></th>\n      <th>All</th>\n      '
-            '<th>In-sample</th>\n      <th>Out-of-sample</th>\n'
-        )
-        return html
+    return print_table(table, header_rows=header_rows, jupyter=jupyter)
 
 
 def get_rolling_returns(returns,

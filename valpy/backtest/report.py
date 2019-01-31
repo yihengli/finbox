@@ -53,6 +53,17 @@ class ReportBuilder(object):
         $(window).on('resize', function(){{
           if(chartRCS != null && chartRCS != undefined){{chartRCS.resize();}} }});
       </script>
+
+    <h2>Drawdown Analysis</h2>
+      {table_dd}
+      <div id="drawdown_and_underwater" style="width: 100%;height:500px;"></div>
+      <script type="text/javascript">
+        var chartDAU = echarts.init(document.getElementById('drawdown_and_underwater'));
+        var optionDAU = {dau_option};
+        chartDAU.setOption(optionDAU);
+        $(window).on('resize', function(){{
+          if(chartDAU != null && chartDAU != undefined){{chartDAU.resize();}} }});
+      </script>
   </div>
 </body>
 </html>
@@ -76,23 +87,28 @@ class ReportBuilder(object):
         jupyter = True if dest is None else False
 
         table = self.get_performance_table(jupyter=jupyter)
+        table_drawdowns = self.get_drawdown_table(jupyter=jupyter)
 
         if jupyter:
             display(self.get_interactive_rolling_returns(jupyter=jupyter))
             display(self.get_interactive_rolling_sharpes(jupyter=jupyter))
+            display(self.get_interactive_drawdown_and_underwater(jupyter))
 
         if dest is not None:
             rct_f, rct_o = self.get_interactive_rolling_returns(
                 jupyter=jupyter)
             rcs_o = self.get_interactive_rolling_sharpes(jupyter=jupyter)
+            dau_o = self.get_interactive_drawdown_and_underwater(jupyter)
 
             with open(dest, 'w') as report:
                 report.write(self.template.format(
                     report_name=self.report_name,
                     table=table,
+                    table_dd=table_drawdowns,
                     rct_func=rct_f,
                     rct_option=rct_o,
-                    rcs_option=rcs_o))
+                    rcs_option=rcs_o,
+                    dau_option=dau_o))
 
     def get_performance_table(self, jupyter=True):
         return pyfolio.show_perf_stats(returns=self.returns,
@@ -100,6 +116,10 @@ class ReportBuilder(object):
                                        transactions=self.transactions,
                                        live_start_date=self.live_start_date,
                                        jupyter=jupyter)
+
+    def get_drawdown_table(self, jupyter=True):
+        return pyfolio.show_worst_drawdown_table(returns=self.returns,
+                                                 jupyter=jupyter, pandas=False)
 
     def get_interactive_rolling_returns(self, jupyter=True):
         plot = plotting.plot_interactive_rolling_returns(
@@ -126,6 +146,15 @@ class ReportBuilder(object):
 
             return func_str, option_str
 
+    def _echart_option_extract(self, plot):
+        html_text = plot._repr_html_()
+        chart_id = plot.chart_id
+        option_start = html_text.find(
+            '{} = {{\n    "title": '.format(chart_id))
+        option_end = html_text.find('\nmyChart_{}'.format(chart_id))
+        option_str = html_text[option_start + len(chart_id) + 3:option_end]
+        return option_str
+
     def get_interactive_rolling_sharpes(self, jupyter=True):
         plot = plotting.plot_interactive_rolling_sharpes(
             returns=self.returns, factor_returns=self.benchmark_rets)
@@ -133,10 +162,13 @@ class ReportBuilder(object):
         if jupyter:
             return plot
         else:
-            html_text = plot._repr_html_()
-            chart_id = plot.chart_id
-            option_start = html_text.find(
-                '{} = {{\n    "title": '.format(chart_id))
-            option_end = html_text.find('\nmyChart_{}'.format(chart_id))
-            option_str = html_text[option_start + len(chart_id) + 3:option_end]
-            return option_str
+            return self._echart_option_extract(plot)
+
+    def get_interactive_drawdown_and_underwater(self, jupyter=True):
+        plot = plotting.plot_interactive_drawdown_underwater(
+            returns=self.returns)
+
+        if jupyter:
+            return plot
+        else:
+            return self._echart_option_extract(plot)

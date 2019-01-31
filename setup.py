@@ -16,6 +16,7 @@ setup(
         'pandas',
         'requests',
         'pyecharts',
+        'pyecharts-snapshot',
         'pyfolio',
     ]
 )
