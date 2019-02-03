@@ -64,6 +64,15 @@ class ReportBuilder(object):
           if(chartRCS != null && chartRCS != undefined){{chartRCS.resize();}} }});
       </script>
 
+      <div id="rolling_betas" style="width: 100%;height:400px;"></div>
+      <script type="text/javascript">
+        var chartRBETA = echarts.init(document.getElementById('rolling_betas'));
+        var optionRBETA = {rbeta_option};
+        chartRBETA.setOption(optionRBETA);
+        $(window).on('resize', function(){{
+          if(chartRBETA != null && chartRBETA != undefined){{chartRBETA.resize();}} }});
+      </script>
+
     <h2>Drawdown Analysis</h2>
       {table_dd}
       <div id="drawdown_and_underwater" style="width: 100%;height:500px;"></div>
@@ -106,16 +115,18 @@ class ReportBuilder(object):
 
         if jupyter:
             display(self.get_interactive_rolling_returns(jupyter=jupyter))
-            display(self.get_interactive_rolling_sharpes(jupyter=jupyter))
-            display(self.get_interactive_drawdown_and_underwater(jupyter))
             display(self.get_interactive_rolling_vol(jupyter=jupyter))
+            display(self.get_interactive_rolling_sharpes(jupyter=jupyter))
+            display(self.get_interactive_rolling_betas(jupyter=jupyter))
+            display(self.get_interactive_drawdown_and_underwater(jupyter))
 
         if dest is not None:
             rct_f, rct_o = self.get_interactive_rolling_returns(
                 jupyter=jupyter)
+            rvol_o = self.get_interactive_rolling_vol(jupyter=jupyter)
+            rbeta_o = self.get_interactive_rolling_betas(jupyter=jupyter)
             rcs_o = self.get_interactive_rolling_sharpes(jupyter=jupyter)
             dau_o = self.get_interactive_drawdown_and_underwater(jupyter)
-            rvol_o = self.get_interactive_rolling_vol(jupyter=jupyter)
 
             with open(dest, 'w') as report:
                 report.write(self.template.format(
@@ -125,6 +136,7 @@ class ReportBuilder(object):
                     rct_func=rct_f,
                     rct_option=rct_o,
                     rvol_option=rvol_o,
+                    rbeta_option=rbeta_o,
                     rcs_option=rcs_o,
                     dau_option=dau_o))
 
@@ -175,6 +187,15 @@ class ReportBuilder(object):
 
     def get_interactive_rolling_vol(self, jupyter=True):
         plot = plotting.plot_interactive_rolling_vol(
+            returns=self.returns, factor_returns=self.benchmark_rets)
+
+        if jupyter:
+            return plot
+        else:
+            return self._echart_option_extract(plot)
+
+    def get_interactive_rolling_betas(self, jupyter=True):
+        plot = plotting.plot_interactive_rolling_betas(
             returns=self.returns, factor_returns=self.benchmark_rets)
 
         if jupyter:

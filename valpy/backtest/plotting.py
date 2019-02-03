@@ -300,6 +300,30 @@ def plot_interactive_drawdown_underwater(returns, top=5):
     return grid
 
 
+def plot_interactive_rolling_betas(returns, factor_returns):
+    rb_1 = pf.timeseries.rolling_beta(
+        returns, factor_returns, rolling_window=APPROX_BDAYS_PER_MONTH * 6)
+    rb_2 = pf.timeseries.rolling_beta(
+        returns, factor_returns, rolling_window=APPROX_BDAYS_PER_MONTH * 12)
+
+    attr = rb_1.index.strftime("%Y-%m-%d")
+    valid_ratio = np.round(rb_2.count() / rb_2.shape[0], 3)
+
+    line = Line("Rolling Betas")
+    line.add("6-Month", attr, np.round(rb_1, 3).tolist(),
+             is_datazoom_show=True, mark_line=["average"],
+             datazoom_range=[(1 - valid_ratio) * 100, 100],
+             **PlottingConfig.LINE_KWARGS)
+    line.add("12-Month", attr, np.round(rb_2, 3).tolist(),
+             mark_line=["average"], **PlottingConfig.BENCH_KWARGS)
+
+    line._option['color'][0] = PlottingConfig.CI_AREA_COLOR
+    line._option['color'][1] = "grey"
+    line._option["series"][0]["markLine"]["lineStyle"] = {"width": 2}
+
+    return line
+
+
 def plot_interactive_rolling_vol(returns, factor_returns,
                                  rolling_window=APPROX_BDAYS_PER_MONTH * 6):
     rolling_vol_ts = pf.timeseries.rolling_volatility(returns, rolling_window)
@@ -312,7 +336,7 @@ def plot_interactive_rolling_vol(returns, factor_returns,
              datazoom_range=[(1 - valid_ratio) * 100, 100],
              **PlottingConfig.LINE_KWARGS)
     line._option['color'][0] = PlottingConfig.ORANGE
-    line._option["series"][0]["markLine"]["lineStyle"] = {"width": 1}
+    line._option["series"][0]["markLine"]["lineStyle"] = {"width": 2}
 
     if factor_returns is not None:
         rolling_vol_ts_factor = pf.timeseries.rolling_volatility(
@@ -321,6 +345,6 @@ def plot_interactive_rolling_vol(returns, factor_returns,
                  np.around(rolling_vol_ts_factor[:len(attr)], 3).tolist(),
                  mark_line=["average"], **PlottingConfig.BENCH_KWARGS)
         line._option['color'][1] = 'grey'
-        line._option["series"][1]["markLine"]["lineStyle"] = {"width": 2}
+        line._option["series"][1]["markLine"]["lineStyle"] = {"width": 1}
 
     return line
