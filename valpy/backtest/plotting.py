@@ -4,7 +4,7 @@ import pandas as pd
 import empyrical as ep
 from pyecharts import Grid, Line, HeatMap
 from . import pyfolio as pf
-from pyfolio.utils import APPROX_BDAYS_PER_MONTH
+from pyfolio.utils import APPROX_BDAYS_PER_MONTH, clip_returns_to_benchmark
 from pyfolio import pos, timeseries
 from IPython.core.display import display, HTML
 from datetime import date
@@ -449,3 +449,72 @@ def plot_interactive_gross_leverage(positions):
     line._option["series"][0]["markLine"]["lineStyle"] = {"width": 2}
 
     return line
+
+
+def plot_interactive_interesting_periods(returns, benchmark_rets=None,
+                                         periods=None, override=False):
+
+    rets_interesting = pf.extract_interesting_date_ranges(
+        returns, periods, override)
+
+    if not rets_interesting:
+        warnings.warn('Passed returns do not overlap with any'
+                      'interesting times.', UserWarning)
+        return
+
+    returns = clip_returns_to_benchmark(returns, benchmark_rets)
+    bmark_interesting = pf.extract_interesting_date_ranges(
+        benchmark_rets, periods, override)
+
+    num_plots = len(rets_interesting)
+    num_rows = int((num_plots + 1) / 2.0)
+    height = num_rows*180
+
+    grid = Grid(height=height)
+
+    up_maxi = 3
+    down_maxi = 3
+    gap = 2
+
+    margin_step = np.round(((100 - up_maxi - down_maxi - gap * (num_rows - 1))
+                            / num_rows), 1)
+
+    t_margins = [up_maxi + i * (margin_step + gap) for i in range(num_rows)]
+    b_margins = [down_maxi + i * (margin_step + gap)
+                 for i in range(num_rows)][::-1]
+
+    for i, (name, rets_period) in enumerate(rets_interesting.items()):
+        top_margin = t_margins[i // 2]
+        bottom_margin = b_margins[i // 2]
+        left_margin = 55 if i % 2 == 1 else 5
+        right_margin = 0 if i % 2 == 1 else 55
+
+        if i != 0:
+            is_legend_show = False
+        else:
+            is_legend_show = True
+
+        line = Line(name, title_top="{}%".format(top_margin),
+                    title_pos="{}%".format(left_margin))
+        cum_rets = ep.cum_returns(rets_period)
+        line.add("Algo", cum_rets.index.strftime("%Y-%m-%d"),
+                 np.round(cum_rets, 3).tolist(), is_splitline_show=False,
+                 is_legend_show=is_legend_show, is_symbol_show=False,
+                 tooltip_trigger='axis', line_width=2, line_opacity=0.8)
+        if benchmark_rets is not None:
+            cum_bech = ep.cum_returns(bmark_interesting[name])
+            line.add("Bench", cum_bech.index.strftime("%Y-%m-%d"),
+                     np.round(cum_bech, 3).tolist(), is_splitline_show=False,
+                     is_legend_show=is_legend_show, is_symbol_show=False,
+                     tooltip_trigger='axis', line_opacity=0.8)
+
+        grid.add(line,
+                 grid_top="{}%".format(top_margin + gap),
+                 grid_bottom="{}%".format(bottom_margin),
+                 grid_left="{}%".format(left_margin),
+                 grid_right="{}%".format(right_margin))
+
+    grid._option["color"][0] = PlottingConfig.GREEN
+    grid._option["color"][1] = "grey"
+
+    return grid, height

@@ -14,6 +14,7 @@ import warnings
 from pyfolio import timeseries
 from pyfolio.utils import APPROX_BDAYS_PER_MONTH
 from .plotting import print_table
+from .interesting_periods import PERIODS
 
 STAT_FUNCS_PCT = [
     'Annual return',
@@ -423,3 +424,47 @@ def get_rolling_sharpe(returns, rolling_window=APPROX_BDAYS_PER_MONTH * 6):
     """
     rolling_sharpe_ts = timeseries.rolling_sharpe(returns, rolling_window)
     return rolling_sharpe_ts
+
+
+def extract_interesting_date_ranges(returns, periods=None, override=False):
+    """
+    Extracts returns based on interesting events. See
+    gen_date_range_interesting.
+
+    Parameters
+    ----------
+    returns : pd.Series
+        Daily returns of the strategy, noncumulative.
+         - See full explanation in tears.create_full_tear_sheet.
+    periods : list[Dict], optional
+        A list of interesting events with key as names, and value as a tuple of
+        pandas timestamps,
+    override : bool, optional
+        if True, the original Periods will be overriden with provided periods
+
+    Returns
+    -------
+    ranges : OrderedDict
+        Date ranges, with returns, of all valid events.
+    """
+    if periods is None:
+        periods = PERIODS
+    elif periods is not None and not override:
+        periods_tmp = PERIODS.copy()
+        for period in periods:
+            periods_tmp.update(period)
+        periods = periods_tmp
+
+    returns_dupe = returns.copy()
+    returns_dupe.index = returns_dupe.index.map(pd.Timestamp)
+    ranges = OrderedDict()
+    for name, (start, end) in periods.items():
+        try:
+            period = returns_dupe.loc[start:end]
+            if len(period) == 0:
+                continue
+            ranges[name] = period
+        except BaseException:
+            continue
+
+    return ranges

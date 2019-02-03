@@ -119,13 +119,16 @@ class ReportBuilder(object):
         $(window).on('resize', function(){{
           if(chartGL != null && chartGL != undefined){{chartGL.resize();}} }});
       </script>
+
+    {interesting_periods_section}
   </div>
 </body>
 </html>
 """ # noqa E501
 
     def __init__(self, strat, benchmark_rets, live_start_date,
-                 report_name='Report'):
+                 report_name='Report', custom_interesting_periods=None,
+                 custom_interesting_periods_overide=False):
         pyfoliozer = strat.analyzers.getbyname('pyfolio')
         returns, positions, transactions, gross_lev = pyfoliozer.get_pf_items()
 
@@ -143,6 +146,9 @@ class ReportBuilder(object):
         self.live_start_date = live_start_date
         self.report_name = report_name
 
+        self.periods = custom_interesting_periods
+        self.override = custom_interesting_periods_overide
+
     def build_report(self, dest=None):
         jupyter = True if dest is None else False
 
@@ -153,12 +159,13 @@ class ReportBuilder(object):
             display(self.get_interactive_rolling_returns(jupyter=jupyter))
             display(self.get_interactive_rolling_vol(jupyter=jupyter))
             display(self.get_interactive_rolling_sharpes(jupyter=jupyter))
-            display(self.get_interactive_rolling_betas(jupyter=jupyter))
+            # display(self.get_interactive_rolling_betas(jupyter=jupyter))
             display(self.get_interactive_monthly_heatmap(jupyter=jupyter))
             display(self.get_interactive_drawdown_and_underwater(jupyter))
             display(self.get_interactive_exposures(jupyter=jupyter))
             display(self.get_interactive_exposures_by_asset(jupyter))
             display(self.get_interactive_gross_leverage(jupyter=jupyter))
+            display(self.get_interactive_interesting_periods(jupyter))
 
         if dest is not None:
             rct_f, rct_o = self.get_interactive_rolling_returns(
@@ -171,6 +178,8 @@ class ReportBuilder(object):
             exp_o = self.get_interactive_exposures(jupyter=jupyter)
             expba_o = self.get_interactive_exposures_by_asset(jupyter=jupyter)
             gl_o = self.get_interactive_gross_leverage(jupyter=jupyter)
+
+            interesting_periods = self.get_interesting_periods_section()
 
             with open(dest, 'w') as report:
                 report.write(self.template.format(
@@ -186,7 +195,8 @@ class ReportBuilder(object):
                     dau_option=dau_o,
                     exp_option=exp_o,
                     expba_option=expba_o,
-                    gl_option=gl_o))
+                    gl_option=gl_o,
+                    interesting_periods_section=interesting_periods))
 
     def get_performance_table(self, jupyter=True):
         return pyfolio.show_perf_stats(returns=self.returns,
@@ -304,3 +314,36 @@ class ReportBuilder(object):
             return plot
         else:
             return self._echart_option_extract(plot)
+
+    def get_interactive_interesting_periods(self, jupyter=True):
+        plot = plotting.plot_interactive_interesting_periods(
+            returns=self.returns, benchmark_rets=self.benchmark_rets,
+            periods=self.periods, override=self.override)
+
+        if jupyter:
+            if plot is None:
+                return "No Interesting Periods Overlapped"
+            return plot[0]
+        else:
+            if plot is None:
+                return None
+            return self._echart_option_extract(plot[0]), plot[1]
+
+    def get_interesting_periods_section(self):
+        template = """
+<hr>
+<h2>Interesting Periods Analysis</h2>
+    <div id="interesting_periods_analysis" style="width: 100%;height:{size}px;"></div>
+    <script type="text/javascript">
+    var chartIPA = echarts.init(document.getElementById('interesting_periods_analysis'));
+    var optionIPA = {ipa_option};
+    chartIPA.setOption(optionIPA);
+    $(window).on('resize', function(){{
+        if(chartIPA != null && chartIPA != undefined){{chartIPA.resize();}} }});
+    </script>
+""" # noqa E501
+        res = self.get_interactive_interesting_periods(jupyter=False)
+        if res is None:
+            return ""
+        else:
+            return template.format(size=res[1], ipa_option=res[0])
