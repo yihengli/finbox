@@ -45,6 +45,15 @@ class ReportBuilder(object):
         $(window).on('resize', function(){{
           if(chartRCT != null && chartRCT != undefined){{chartRCT.resize();}} }});
       </script>
+
+      <div id="rolling_vols" style="width: 100%;height:400px;"></div>
+      <script type="text/javascript">
+        var chartRVOL = echarts.init(document.getElementById('rolling_vols'));
+        var optionRVOL = {rvol_option};
+        chartRVOL.setOption(optionRVOL);
+        $(window).on('resize', function(){{
+          if(chartRVOL != null && chartRVOL != undefined){{chartRVOL.resize();}} }});
+      </script>
       
       <div id="rolling_cum_sharpes" style="width: 100%;height:400px;"></div>
       <script type="text/javascript">
@@ -99,12 +108,14 @@ class ReportBuilder(object):
             display(self.get_interactive_rolling_returns(jupyter=jupyter))
             display(self.get_interactive_rolling_sharpes(jupyter=jupyter))
             display(self.get_interactive_drawdown_and_underwater(jupyter))
+            display(self.get_interactive_rolling_vol(jupyter=jupyter))
 
         if dest is not None:
             rct_f, rct_o = self.get_interactive_rolling_returns(
                 jupyter=jupyter)
             rcs_o = self.get_interactive_rolling_sharpes(jupyter=jupyter)
             dau_o = self.get_interactive_drawdown_and_underwater(jupyter)
+            rvol_o = self.get_interactive_rolling_vol(jupyter=jupyter)
 
             with open(dest, 'w') as report:
                 report.write(self.template.format(
@@ -113,6 +124,7 @@ class ReportBuilder(object):
                     table_dd=table_drawdowns,
                     rct_func=rct_f,
                     rct_option=rct_o,
+                    rvol_option=rvol_o,
                     rcs_option=rcs_o,
                     dau_option=dau_o))
 
@@ -160,6 +172,15 @@ class ReportBuilder(object):
         option_end = html_text.find('\nmyChart_{}'.format(chart_id))
         option_str = html_text[option_start + len(chart_id) + 3:option_end]
         return option_str
+
+    def get_interactive_rolling_vol(self, jupyter=True):
+        plot = plotting.plot_interactive_rolling_vol(
+            returns=self.returns, factor_returns=self.benchmark_rets)
+
+        if jupyter:
+            return plot
+        else:
+            return self._echart_option_extract(plot)
 
     def get_interactive_rolling_sharpes(self, jupyter=True):
         plot = plotting.plot_interactive_rolling_sharpes(

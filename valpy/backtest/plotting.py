@@ -4,6 +4,7 @@ import pandas as pd
 import empyrical as ep
 from pyecharts import Grid, Line
 from . import pyfolio as pf
+from pyfolio.utils import APPROX_BDAYS_PER_MONTH
 from IPython.core.display import display, HTML
 
 
@@ -297,3 +298,29 @@ def plot_interactive_drawdown_underwater(returns, top=5):
     grid._option["axisPointer"] = {"link": {"xAxisIndex": 'all'}}
 
     return grid
+
+
+def plot_interactive_rolling_vol(returns, factor_returns,
+                                 rolling_window=APPROX_BDAYS_PER_MONTH * 6):
+    rolling_vol_ts = pf.timeseries.rolling_volatility(returns, rolling_window)
+    attr = rolling_vol_ts.index.strftime("%Y-%m-%d")
+    valid_ratio = np.round(rolling_vol_ts.count() / rolling_vol_ts.shape[0], 3)
+
+    line = Line("Rolling Volatility (6-Month)")
+    line.add("Volatility", attr, np.round(rolling_vol_ts, 3).tolist(),
+             is_datazoom_show=True, mark_line=["average"],
+             datazoom_range=[(1 - valid_ratio) * 100, 100],
+             **PlottingConfig.LINE_KWARGS)
+    line._option['color'][0] = PlottingConfig.ORANGE
+    line._option["series"][0]["markLine"]["lineStyle"] = {"width": 1}
+
+    if factor_returns is not None:
+        rolling_vol_ts_factor = pf.timeseries.rolling_volatility(
+            factor_returns, rolling_window)
+        line.add("Benchmark Volatiltiy", attr,
+                 np.around(rolling_vol_ts_factor[:len(attr)], 3).tolist(),
+                 mark_line=["average"], **PlottingConfig.BENCH_KWARGS)
+        line._option['color'][1] = 'grey'
+        line._option["series"][1]["markLine"]["lineStyle"] = {"width": 2}
+
+    return line
