@@ -1,6 +1,7 @@
 from . import pyfolio
 from . import plotting
 from IPython.core.display import display
+import pandas as pd
 
 
 class ReportBuilder(object):
@@ -73,6 +74,11 @@ class ReportBuilder(object):
                  report_name='Report'):
         pyfoliozer = strat.analyzers.getbyname('pyfolio')
         returns, positions, transactions, gross_lev = pyfoliozer.get_pf_items()
+
+        benchmark_rets = pd.merge(pd.DataFrame(returns),
+                                  pd.DataFrame(benchmark_rets),
+                                  left_index=True, right_index=True,
+                                  how="left").fillna(0).iloc[:, 1]
 
         self.returns = returns
         self.positions = positions

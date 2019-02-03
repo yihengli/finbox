@@ -1,6 +1,7 @@
 import backtrader as bt
 import pandas as pd
 import numpy as np
+import warnings
 
 from ..data.equity import get_history
 from .pyfolio import PyFolio
@@ -21,7 +22,7 @@ class BacktestLogger(object):
             print('%s, %s' % (dt.isoformat(), txt))
 
     @staticmethod
-    def notify_order(strategy, order):
+    def notify_order(strategy, order, is_warn=True):
         if order.status in [order.Submitted, order.Accepted]:
             # Buy/Sell order submitted/accepted to/by broker - Nothing to do
             return
@@ -51,6 +52,9 @@ class BacktestLogger(object):
             strategy.log('Order Canceled/Margin/Rejected: Order Price: %.2f, '
                          'Size: %.2f' %
                          (order.created.price, order.created.size))
+            if is_warn:
+                warnings.warn("Order Canceled/Margin/Rejected, make sure you "
+                              "are good with it")
 
         # Write down: no pending order
         strategy.order = None
@@ -243,7 +247,8 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
                                      is_debug=False, lazy_rebalance=False,
                                      coc=True, dataset=None,
                                      initial_cash=100000., adjclose=True,
-                                     commission_settings=None):
+                                     commission_settings=None, warn_order=True,
+                                     smart_execute=True, weight_slippage=0.):
     """
     Given a specific ticker (currently only supports Equity) and a signal
     (currently only support daily resolution) with -1, 0 and 1. The backtest
@@ -311,7 +316,8 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
 
         # Force each asset start from the same start date
         maxi_fromdate = max([d.index.min().strftime('%Y-%m-%d')
-                             for d in datasets])
+                             for d in datasets] +
+                            [weights.index.min().strftime('%Y-%m-%d')])
 
         # Build a list of pandas datafeeds
         data_feed_list = []
@@ -336,13 +342,15 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
             ('debug', True),
             ('tickers', None),
             ('fromdate', None),
+            ('smart_execute', True),
+            ('weight_slippage', 0.)
         )
 
         def log(self, txt, dt=None):
             btlogger.log(self, txt, dt)
 
         def notify_order(self, order):
-            btlogger.notify_order(self, order)
+            btlogger.notify_order(self, order, warn_order)
 
         def notify_trade(self, trade):
             btlogger.notify_trade(self, trade)
@@ -394,7 +402,8 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
                 dt1 = data.datetime.datetime()
             interest = cominfo.get_credit_interest(data, cur_pos, dt1)
 
-            self.log("<%s> Interest Fees: %f" % (ticker, interest))
+            if interest > 0:
+                self.log("<%s> Interest Fees: %f" % (ticker, interest))
             cost = cost + interest
 
             return delta_value, cost, price
@@ -466,6 +475,7 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
                     self.log(
                         "<{}> WEIGHTS CHANGE From {:.3f} TO {:.3f}".format(
                             action["name"], action["last_w"], action["cur_w"]))
+
                     self.smart_order_with_action(action, clear_cost_per_order)
 
         def smart_order_with_action(self, action, additional_cost):
@@ -479,18 +489,25 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
             p = action["price"]
             ticker = action["name"]
 
-            if w != 0:
-
-                # For action that's not clear order, include clear cost
-                cost = action["cost"] + additional_cost
-
-                # Adjust each order's value by decreasing size to fullfill cost
-                if v - cost > 0:
-                    order = self.buy(data=ticker, size=(v - cost) // p)
-                elif v - cost < 0:
-                    order = self.sell(data=ticker, size=(v - cost) // p)
+            # If Smart Exe option is closed, will not adjust order values
+            if not self.params.smart_execute:
+                order = self.order_target_percent(data=ticker, target=w)
+            # Adjust order value based on comm cost and intrests cost
             else:
-                order = self.order_target_value(data=ticker, target=0)
+                if w != 0:
+
+                    # For action that's not clear order, include clear cost
+                    cost = action["cost"] + additional_cost
+
+                    # Adjust each order's value by decr size to fullfill cost
+                    if v > 0 and v - cost > 0:
+                        v *= (1 - self.params.weight_slippage)
+                        order = self.buy(data=ticker, size=(v - cost) // p)
+                    elif v < 0 and v - cost < 0:
+                        v *= (1 + self.params.weight_slippage)
+                        order = self.sell(data=ticker, size=(v - cost) // p)
+                else:
+                    order = self.order_target_value(data=ticker, target=0)
 
             if order is not None:
                 signal = "BUY" if order.isbuy() else "SELL"
@@ -502,11 +519,6 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
         def next(self):
             self.log("CASH: {:.2f} | Portfolio {:.2f}".format(
                 self.broker.get_cash(), self.broker.get_value()))
-
-            # Record the current positions
-            for ticker in self.params.tickers:
-                self.last_positions[ticker] = \
-                    self.broker.getposition(self.getdatabyname(ticker))
 
             # Build weight list and sort weight list
             # action_list_item = [
@@ -527,7 +539,8 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
                                                          datasets)
     cerebro.addstrategy(WeightsRebalanceStrategy, tickers=tickers,
                         debug=is_debug, lazy_rebalance=lazy_rebalance,
-                        fromdate=maxi_fromdate)
+                        fromdate=maxi_fromdate, smart_execute=smart_execute,
+                        weight_slippage=weight_slippage)
 
     for data, ticker in zip(data_feeds, tickers):
         cerebro.adddata(data, name=ticker)
