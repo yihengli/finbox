@@ -42,8 +42,8 @@ class BacktestLogger(object):
                 strategy.log('SELL EXECUTED, Price: %.2f, Size: %.1f, '
                              'Comm %.2f' %
                              (order.executed.price,
-                                 order.executed.size,
-                                 order.executed.comm))
+                              order.executed.size,
+                              order.executed.comm))
 
             strategy.bar_executed = len(strategy)
 
@@ -105,10 +105,10 @@ def get_customized_pandasfeed(data, col_name, adjclose=True):
     return CustomizedPandasData(dataname=df)
 
 
-def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
+def build_single_signal_strategy(ticker, signal, is_debug=False,
                                  max_no_signal_days=1, coc=True, dataset=None,
-                                 initial_cash=100000., commission=0.,
-                                 adjclose=True):
+                                 initial_cash=100000., adjclose=True,
+                                 commission_settings=None):
     """
     Given a specific ticker (currently only supports Equity) and a signal
     (currently only support daily resolution) with -1, 0 and 1. The backtest
@@ -124,9 +124,6 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
     is_debug : bool, optional
         Toggle Debugging mode (the default is False, which not print out any
         transaction details)
-    leverage : int, optional
-        Leverage level for the strategy (the default is 1, which means no
-        leverage is applied)
     max_no_signal_days : int, optional
         The maximum days the strategy will hold its position when there is no
         long / short signals (the default is 1, which means it will immediately
@@ -138,11 +135,12 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
         If provided, this function will use given dataset
     initial_cash : float, optional
         The initial capital when starting the strategy (the default is 100000)
-    commission : float, optional
-        Currently only supports percentage based commisions settings.
     adjclose : bool, optional
         Whether to use the dividend/split adjusted close and adjust all values
         according to it.
+    commission_settings : list[dict]
+        A list of commission settings including commision, interest, leverage,
+        that will be applied to the backtrader engine in order.
 
     Returns
     -------
@@ -230,7 +228,9 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
     cerebro.broker.set_coc(coc)
     cerebro.addanalyzer(PyFolio)
 
-    cerebro.broker.setcommission(commission=commission, leverage=leverage)
+    if commission_settings is not None:
+        for setting in commission_settings:
+            cerebro.broker.setcommission(**setting)
 
     # Run over everything
     strats = cerebro.run()
@@ -241,9 +241,9 @@ def build_single_signal_strategy(ticker, signal, is_debug=False, leverage=1,
 
 def build_weights_rebalance_strategy(tickers, weights, datasets=None,
                                      is_debug=False, lazy_rebalance=False,
-                                     leverage=1, coc=True, dataset=None,
-                                     initial_cash=100000., commission=0.,
-                                     adjclose=True):
+                                     coc=True, dataset=None,
+                                     initial_cash=100000., adjclose=True,
+                                     commission_settings=None):
     """
     Given a specific ticker (currently only supports Equity) and a signal
     (currently only support daily resolution) with -1, 0 and 1. The backtest
@@ -269,19 +269,17 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
     is_debug : bool, optional
         Toggle Debugging mode (the default is False, which not print out any
         transaction details)
-    leverage : int, optional
-        Leverage level for the strategy (the default is 1, which means no
-        leverage is applied)
     coc : bool, optional
         Cheat on Close Price Option (the default is True, which means the
         backtest assumes you can always buy or sell at the close price per day)
     initial_cash : float, optional
         The initial capital when starting the strategy (the default is 100000)
-    commission : float, optional
-        Currently only supports percentage based commisions settings.
     adjclose : bool, optional
         Whether to use the dividend/split adjusted close and adjust all values
         according to it.
+    commission_settings : list[dict]
+        A list of commission settings including commision, interest, leverage,
+        that will be applied to the backtrader engine in order.
 
     Returns
     -------
@@ -388,6 +386,17 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
             cominfo = self.broker.getcommissioninfo(data)
             cost = cominfo.getcommission(np.abs(delta_value) // price, price)
 
+            # Calculate interests caused due to short positions or ETF similar
+            cur_pos.datetime = data.datetime.datetime()
+            try:
+                dt1 = data.datetime.datetime(1)
+            except IndexError:
+                dt1 = data.datetime.datetime()
+            interest = cominfo.get_credit_interest(data, cur_pos, dt1)
+
+            self.log("<%s> Interest Fees: %f" % (ticker, interest))
+            cost = cost + interest
+
             return delta_value, cost, price
 
         def _build_action_list(self):
@@ -476,16 +485,16 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
                 cost = action["cost"] + additional_cost
 
                 # Adjust each order's value by decreasing size to fullfill cost
-                if v > 0:
+                if v - cost > 0:
                     order = self.buy(data=ticker, size=(v - cost) // p)
-                elif v < 0:
+                elif v - cost < 0:
                     order = self.sell(data=ticker, size=(v - cost) // p)
             else:
                 order = self.order_target_value(data=ticker, target=0)
 
             if order is not None:
                 signal = "BUY" if order.isbuy() else "SELL"
-                self.log("<%s> %s CREATED: size %.1f | price %.1f" %
+                self.log("<%s> %s CREATED: size %.1f | price %.3f" %
                          (ticker, signal, order.created.size,
                           order.created.price))
             return order
@@ -493,6 +502,11 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
         def next(self):
             self.log("CASH: {:.2f} | Portfolio {:.2f}".format(
                 self.broker.get_cash(), self.broker.get_value()))
+
+            # Record the current positions
+            for ticker in self.params.tickers:
+                self.last_positions[ticker] = \
+                    self.broker.getposition(self.getdatabyname(ticker))
 
             # Build weight list and sort weight list
             # action_list_item = [
@@ -512,17 +526,22 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
                                                          weights,
                                                          datasets)
     cerebro.addstrategy(WeightsRebalanceStrategy, tickers=tickers,
-                        lazy_rebalance=lazy_rebalance, fromdate=maxi_fromdate)
+                        debug=is_debug, lazy_rebalance=lazy_rebalance,
+                        fromdate=maxi_fromdate)
 
     for data, ticker in zip(data_feeds, tickers):
         cerebro.adddata(data, name=ticker)
+
     cerebro.broker.setcash(initial_cash)
 
     cerebro.broker.set_coc(coc)
     cerebro.addanalyzer(PyFolio)
 
     cerebro.broker.set_checksubmit(False)
-    cerebro.broker.setcommission(commission=commission, leverage=leverage)
+
+    if commission_settings is not None:
+        for setting in commission_settings:
+            cerebro.broker.setcommission(**setting)
 
     # Run over everything
     strats = cerebro.run()
