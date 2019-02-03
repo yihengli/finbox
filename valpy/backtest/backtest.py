@@ -506,6 +506,8 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
                     elif v < 0 and v - cost < 0:
                         v *= (1 + self.params.weight_slippage)
                         order = self.sell(data=ticker, size=(v - cost) // p)
+                    else:
+                        order = None
                 else:
                     order = self.order_target_value(data=ticker, target=0)
 
