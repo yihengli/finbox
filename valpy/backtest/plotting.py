@@ -5,6 +5,7 @@ import empyrical as ep
 from pyecharts import Grid, Line, HeatMap
 from . import pyfolio as pf
 from pyfolio.utils import APPROX_BDAYS_PER_MONTH
+from pyfolio import pos, timeseries
 from IPython.core.display import display, HTML
 from datetime import date
 
@@ -414,4 +415,37 @@ def plot_interactive_exposures(returns, positions):
     line._option['color'][0] = PlottingConfig.GREEN
     line._option['color'][1] = PlottingConfig.ORANGE
     line._option['color'][2] = 'black'
+    return line
+
+
+def plot_interactive_exposures_by_asset(positions):
+    pos_alloc = pos.get_percent_alloc(positions)
+    pos_alloc_no_cash = pos_alloc.drop('cash', axis=1)
+
+    attr = pos_alloc_no_cash.index.strftime("%Y-%m-%d")
+
+    line = Line("Exposures By Asset")
+
+    for col in pos_alloc_no_cash.columns:
+        line.add(col, attr, np.round(pos_alloc_no_cash[col], 2).tolist(),
+                 is_more_utils=True, is_datazoom_show=True,
+                 line_width=2, line_opacity=0.7,
+                 datazoom_range=[0, 100], tooltip_trigger="axis")
+
+    return line
+
+
+def plot_interactive_gross_leverage(positions):
+
+    gl = timeseries.gross_lev(positions)
+    line = Line("Gross Leverage")
+
+    line.add("Gross Leverage", gl.index.strftime("%Y-%m-%d"),
+             np.round(gl, 3).tolist(), is_datazoom_show=True,
+             mark_line=["average"], datazoom_range=[0, 100],
+             **PlottingConfig.LINE_KWARGS)
+
+    line._option['color'][0] = PlottingConfig.GREEN
+    line._option["series"][0]["markLine"]["lineStyle"] = {"width": 2}
+
     return line

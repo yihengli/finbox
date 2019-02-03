@@ -95,13 +95,29 @@ class ReportBuilder(object):
 
     <hr>
     <h2>Position Analysis</h2>
-      <div id="exposure_positions" style="width: 100%;height:500px;"></div>
+      <div id="exposure_positions" style="width: 100%;height:400px;"></div>
       <script type="text/javascript">
         var chartEXP = echarts.init(document.getElementById('exposure_positions'));
         var optionEXP = {exp_option};
         chartEXP.setOption(optionEXP);
         $(window).on('resize', function(){{
           if(chartEXP != null && chartEXP != undefined){{chartEXP.resize();}} }});
+      </script>
+      <div id="exposure_by_asset" style="width: 100%;height:400px;"></div>
+      <script type="text/javascript">
+        var chartEXPBA = echarts.init(document.getElementById('exposure_by_asset'));
+        var optionEXPBA = {expba_option};
+        chartEXPBA.setOption(optionEXPBA);
+        $(window).on('resize', function(){{
+          if(chartEXPBA != null && chartEXPBA != undefined){{chartEXPBA.resize();}} }});
+      </script>
+      <div id="gross_leverages" style="width: 100%;height:400px;"></div>
+      <script type="text/javascript">
+        var chartGL = echarts.init(document.getElementById('gross_leverages'));
+        var optionGL = {gl_option};
+        chartGL.setOption(optionGL);
+        $(window).on('resize', function(){{
+          if(chartGL != null && chartGL != undefined){{chartGL.resize();}} }});
       </script>
   </div>
 </body>
@@ -141,6 +157,8 @@ class ReportBuilder(object):
             display(self.get_interactive_monthly_heatmap(jupyter=jupyter))
             display(self.get_interactive_drawdown_and_underwater(jupyter))
             display(self.get_interactive_exposures(jupyter=jupyter))
+            display(self.get_interactive_exposures_by_asset(jupyter))
+            display(self.get_interactive_gross_leverage(jupyter=jupyter))
 
         if dest is not None:
             rct_f, rct_o = self.get_interactive_rolling_returns(
@@ -151,6 +169,8 @@ class ReportBuilder(object):
             mrh_o = self.get_interactive_monthly_heatmap(jupyter=jupyter)
             dau_o = self.get_interactive_drawdown_and_underwater(jupyter)
             exp_o = self.get_interactive_exposures(jupyter=jupyter)
+            expba_o = self.get_interactive_exposures_by_asset(jupyter=jupyter)
+            gl_o = self.get_interactive_gross_leverage(jupyter=jupyter)
 
             with open(dest, 'w') as report:
                 report.write(self.template.format(
@@ -164,7 +184,9 @@ class ReportBuilder(object):
                     rcs_option=rcs_o,
                     mrh_option=mrh_o,
                     dau_option=dau_o,
-                    exp_option=exp_o))
+                    exp_option=exp_o,
+                    expba_option=expba_o,
+                    gl_option=gl_o))
 
     def get_performance_table(self, jupyter=True):
         return pyfolio.show_perf_stats(returns=self.returns,
@@ -259,6 +281,24 @@ class ReportBuilder(object):
 
         plot = plotting.plot_interactive_exposures(
             returns=self.returns, positions=self.positions)
+
+        if jupyter:
+            return plot
+        else:
+            return self._echart_option_extract(plot)
+
+    def get_interactive_exposures_by_asset(self, jupyter=True):
+        plot = plotting.plot_interactive_exposures_by_asset(
+            positions=self.positions)
+
+        if jupyter:
+            return plot
+        else:
+            return self._echart_option_extract(plot)
+
+    def get_interactive_gross_leverage(self, jupyter=True):
+        plot = plotting.plot_interactive_gross_leverage(
+            positions=self.positions)
 
         if jupyter:
             return plot
