@@ -73,6 +73,15 @@ class ReportBuilder(object):
           if(chartRBETA != null && chartRBETA != undefined){{chartRBETA.resize();}} }});
       </script>
 
+      <div id="monthly_returns_heatmap" style="width: 100%;height:400px;"></div>
+      <script type="text/javascript">
+        var chartMRH = echarts.init(document.getElementById('monthly_returns_heatmap'));
+        var optionMRH = {mrh_option};
+        chartMRH.setOption(optionMRH);
+        $(window).on('resize', function(){{
+          if(chartMRH != null && chartMRH != undefined){{chartMRH.resize();}} }});
+      </script>
+
     <h2>Drawdown Analysis</h2>
       {table_dd}
       <div id="drawdown_and_underwater" style="width: 100%;height:500px;"></div>
@@ -118,6 +127,7 @@ class ReportBuilder(object):
             display(self.get_interactive_rolling_vol(jupyter=jupyter))
             display(self.get_interactive_rolling_sharpes(jupyter=jupyter))
             display(self.get_interactive_rolling_betas(jupyter=jupyter))
+            display(self.get_interactive_monthly_heatmap(jupyter=jupyter))
             display(self.get_interactive_drawdown_and_underwater(jupyter))
 
         if dest is not None:
@@ -126,6 +136,7 @@ class ReportBuilder(object):
             rvol_o = self.get_interactive_rolling_vol(jupyter=jupyter)
             rbeta_o = self.get_interactive_rolling_betas(jupyter=jupyter)
             rcs_o = self.get_interactive_rolling_sharpes(jupyter=jupyter)
+            mrh_o = self.get_interactive_monthly_heatmap(jupyter=jupyter)
             dau_o = self.get_interactive_drawdown_and_underwater(jupyter)
 
             with open(dest, 'w') as report:
@@ -138,6 +149,7 @@ class ReportBuilder(object):
                     rvol_option=rvol_o,
                     rbeta_option=rbeta_o,
                     rcs_option=rcs_o,
+                    mrh_option=mrh_o,
                     dau_option=dau_o))
 
     def get_performance_table(self, jupyter=True):
@@ -206,6 +218,14 @@ class ReportBuilder(object):
     def get_interactive_rolling_sharpes(self, jupyter=True):
         plot = plotting.plot_interactive_rolling_sharpes(
             returns=self.returns, factor_returns=self.benchmark_rets)
+
+        if jupyter:
+            return plot
+        else:
+            return self._echart_option_extract(plot)
+
+    def get_interactive_monthly_heatmap(self, jupyter=True):
+        plot = plotting.plot_interactive_monthly_heatmap(returns=self.returns)
 
         if jupyter:
             return plot

@@ -2,10 +2,11 @@ import warnings
 import numpy as np
 import pandas as pd
 import empyrical as ep
-from pyecharts import Grid, Line
+from pyecharts import Grid, Line, HeatMap
 from . import pyfolio as pf
 from pyfolio.utils import APPROX_BDAYS_PER_MONTH
 from IPython.core.display import display, HTML
+from datetime import date
 
 
 class Number:
@@ -348,3 +349,40 @@ def plot_interactive_rolling_vol(returns, factor_returns,
         line._option["series"][1]["markLine"]["lineStyle"] = {"width": 1}
 
     return line
+
+
+def plot_interactive_monthly_heatmap(returns):
+
+    monthly_ret_table = ep.aggregate_returns(returns, 'monthly')
+    monthly_ret_table = monthly_ret_table.unstack().round(3)
+
+    monthly_ret_table = np.round(monthly_ret_table * 100, 2)
+    lim = lim = max(np.max(np.abs(monthly_ret_table)))
+
+    y_axis = [date(1000, i, 1).strftime('%b') for i in range(1, 13)]
+    x_axis = [str(y) for y in monthly_ret_table.index.tolist()]
+    data = data = [[x_axis[i], y_axis[j], monthly_ret_table.values[i][j]]
+                   for i in range(monthly_ret_table.shape[0])
+                   for j in range(monthly_ret_table.shape[1])]
+
+    heatmap = HeatMap("Monthly Returns")
+    heatmap.add(
+        "Monthly Returns",
+        x_axis,
+        y_axis,
+        data,
+        is_visualmap=True,
+        is_datazoom_show=True,
+        datazoom_orient='horizontal',
+        datazoom_range=[0, 100],
+        visual_range=[-lim, lim],
+        visual_text_color="#000",
+        visual_range_color=['#D73027', '#FFFFBF', '#1A9641'],
+        visual_orient="vertical",
+        is_toolbox_show=False,
+        is_label_show=True,
+        label_pos="inside",
+        label_text_color="black",
+        tooltip_formatter="{c}%"
+    )
+    return heatmap
