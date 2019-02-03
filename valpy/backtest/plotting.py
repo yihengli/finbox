@@ -386,3 +386,32 @@ def plot_interactive_monthly_heatmap(returns):
         tooltip_formatter="{c}%"
     )
     return heatmap
+
+
+def plot_interactive_exposures(returns, positions):
+
+    pos_no_cash = positions.drop('cash', axis=1)
+
+    l_exp = pos_no_cash[pos_no_cash > 0].sum(axis=1) / positions.sum(axis=1)
+    s_exp = pos_no_cash[pos_no_cash < 0].sum(axis=1) / positions.sum(axis=1)
+    net_exp = pos_no_cash.sum(axis=1) / positions.sum(axis=1)
+
+    line = Line("Exposure")
+    attr = l_exp.index.strftime("%Y-%m-%d")
+
+    line.add("Long", attr, np.round(l_exp, 3).tolist(),
+             is_datazoom_show=True, datazoom_range=[0, 100],
+             is_step=True, area_opacity=0.7, tooltip_trigger="axis",
+             is_symbol_show=False, line_opacity=0)
+    line.add("Short", attr, np.round(s_exp, 3).tolist(),
+             is_datazoom_show=True, datazoom_range=[0, 100],
+             is_step=True, area_opacity=0.7, tooltip_trigger="axis",
+             is_symbol_show=False, line_opacity=0)
+    line.add("Net", attr, np.round(net_exp, 3).tolist(),
+             is_datazoom_show=True, datazoom_range=[0, 100],
+             tooltip_trigger="axis", is_symbol_show=False)
+
+    line._option['color'][0] = PlottingConfig.GREEN
+    line._option['color'][1] = PlottingConfig.ORANGE
+    line._option['color'][2] = 'black'
+    return line

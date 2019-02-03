@@ -92,6 +92,17 @@ class ReportBuilder(object):
         $(window).on('resize', function(){{
           if(chartDAU != null && chartDAU != undefined){{chartDAU.resize();}} }});
       </script>
+
+    <hr>
+    <h2>Position Analysis</h2>
+      <div id="exposure_positions" style="width: 100%;height:500px;"></div>
+      <script type="text/javascript">
+        var chartEXP = echarts.init(document.getElementById('exposure_positions'));
+        var optionEXP = {exp_option};
+        chartEXP.setOption(optionEXP);
+        $(window).on('resize', function(){{
+          if(chartEXP != null && chartEXP != undefined){{chartEXP.resize();}} }});
+      </script>
   </div>
 </body>
 </html>
@@ -129,6 +140,7 @@ class ReportBuilder(object):
             display(self.get_interactive_rolling_betas(jupyter=jupyter))
             display(self.get_interactive_monthly_heatmap(jupyter=jupyter))
             display(self.get_interactive_drawdown_and_underwater(jupyter))
+            display(self.get_interactive_exposures(jupyter=jupyter))
 
         if dest is not None:
             rct_f, rct_o = self.get_interactive_rolling_returns(
@@ -138,6 +150,7 @@ class ReportBuilder(object):
             rcs_o = self.get_interactive_rolling_sharpes(jupyter=jupyter)
             mrh_o = self.get_interactive_monthly_heatmap(jupyter=jupyter)
             dau_o = self.get_interactive_drawdown_and_underwater(jupyter)
+            exp_o = self.get_interactive_exposures(jupyter=jupyter)
 
             with open(dest, 'w') as report:
                 report.write(self.template.format(
@@ -150,7 +163,8 @@ class ReportBuilder(object):
                     rbeta_option=rbeta_o,
                     rcs_option=rcs_o,
                     mrh_option=mrh_o,
-                    dau_option=dau_o))
+                    dau_option=dau_o,
+                    exp_option=exp_o))
 
     def get_performance_table(self, jupyter=True):
         return pyfolio.show_perf_stats(returns=self.returns,
@@ -235,6 +249,16 @@ class ReportBuilder(object):
     def get_interactive_drawdown_and_underwater(self, jupyter=True):
         plot = plotting.plot_interactive_drawdown_underwater(
             returns=self.returns)
+
+        if jupyter:
+            return plot
+        else:
+            return self._echart_option_extract(plot)
+
+    def get_interactive_exposures(self, jupyter=True):
+
+        plot = plotting.plot_interactive_exposures(
+            returns=self.returns, positions=self.positions)
 
         if jupyter:
             return plot
