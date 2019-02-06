@@ -2,6 +2,16 @@
 
 This is a Python client for a set of Finance related tools.
 
+## How to Install
+
+This project is very new and hasn't been pushed to `PyPI` yet. For any one who is willing to use, please directly install from github:
+
+```
+pip install -e git+https://github.com/yihengli/valpy#egg=valpy
+```
+
+A more detailed doc is also under development.
+
 ## Data APIs
 
 The goal is to easily access finance data as pandas dataframe from various data vendors or ingesting data and pull data from internal data storages. (this may be useful for API that has request limits)
