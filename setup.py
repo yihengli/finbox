@@ -13,10 +13,12 @@ setup(
     ],
     install_requires=[
         'backtrader',
+        'colorlog',
         'pandas',
         'requests',
         'pyecharts',
         'pyecharts-snapshot',
         'pyfolio',
+        'tqdm'
     ]
 )

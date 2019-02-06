@@ -402,7 +402,7 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
                 dt1 = data.datetime.datetime()
             interest = cominfo.get_credit_interest(data, cur_pos, dt1)
 
-            if interest > 0:
+            if interest != 0:
                 self.log("<%s> Interest Fees: %f" % (ticker, interest))
             cost = cost + interest
 
