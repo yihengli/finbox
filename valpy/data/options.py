@@ -88,8 +88,8 @@ class OratsData:
 
         df_dict = {}
 
-        tqdm = utils.get_tqdm()
-        for date in tqdm(dates):
+        tqdm, ascii = utils.get_tqdm()
+        for date in tqdm(dates, ascii=ascii):
             data_per_day = self._get_history_data(name, ticker, date,
                                                   fields, filters)
             if data_per_day is None:
