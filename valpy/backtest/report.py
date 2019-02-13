@@ -128,9 +128,18 @@ class ReportBuilder(object):
 
     def __init__(self, strat, benchmark_rets, live_start_date,
                  report_name='Report', custom_interesting_periods=None,
-                 custom_interesting_periods_overide=False):
-        pyfoliozer = strat.analyzers.getbyname('pyfolio')
-        returns, positions, transactions, gross_lev = pyfoliozer.get_pf_items()
+                 custom_interesting_periods_overide=False,
+                 returns=None, positions=None, transactions=None,
+                 gross_lev=None):
+
+        if strat is not None:
+            pyfoliozer = strat.analyzers.getbyname('pyfolio')
+            returns, positions, transactions, gross_lev = \
+                pyfoliozer.get_pf_items()
+        else:
+            if returns is None or positions is None or transactions is None:
+                raise Exception("Either a `strat` object or `returns, "
+                                "positions, transactions` should be provided")
 
         benchmark_rets = pd.merge(pd.DataFrame(returns),
                                   pd.DataFrame(benchmark_rets),
