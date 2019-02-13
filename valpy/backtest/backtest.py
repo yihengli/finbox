@@ -299,10 +299,6 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
         Get the a set of pandas data feed with a weights dataframe
         """
 
-        if len(tickers) != weights.shape[1] or len(tickers) != len(datasets):
-            raise Exception("`tickers`, `datasets` and `weights`'s columns '"
-                            "must have the same length and in the same order")
-
         fromdate = weights.index.min().strftime('%Y-%m-%d')
         todate = weights.index.max().strftime('%Y-%m-%d')
         weights.columns = tickers
@@ -313,6 +309,10 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
             for ticker in tickers:
                 datasets.append(get_history(ticker, fromdate=fromdate,
                                             todate=todate, set_index=True))
+
+        if len(tickers) != weights.shape[1] or len(tickers) != len(datasets):
+            raise Exception("`tickers`, `datasets` and `weights`'s columns '"
+                            "must have the same length and in the same order")
 
         # Force each asset start from the same start date
         maxi_fromdate = max([d.index.min().strftime('%Y-%m-%d')
