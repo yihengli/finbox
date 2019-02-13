@@ -1,4 +1,4 @@
-asn1crypto==0.24.0
+﻿asn1crypto==0.24.0
 backcall==0.1.0
 backtrader==1.9.70.122
 Bottleneck==1.2.1
@@ -13,7 +13,6 @@ decorator==4.3.2
 dukpy==0.2.2
 empyrical==0.5.0
 flake8==3.6.0
-funcsigs==1.0.2
 future==0.17.1
 h5py==2.9.0
 idna==2.8
@@ -23,13 +22,13 @@ ipython-genutils==0.2.0
 javascripthon==0.10
 jedi==0.13.2
 Jinja2==2.10
-joblib==0.13.1
+joblib==0.12.5
 jupyter-client==5.2.4
 jupyter-core==4.4.0
 jupyter-echarts-pypkg==0.1.2
 kiwisolver==1.0.1
 lml==0.0.2
-lxml==4.3.0
+lxml==4.3.1
 macropy3==1.1.0b2
 Mako==1.0.7
 MarkupSafe==1.1.0
@@ -37,13 +36,12 @@ matplotlib==3.0.2
 mccabe==0.6.1
 mkl-fft==1.0.10
 mkl-random==1.0.2
-mock==2.0.0
 numpy==1.15.4
+olefile==0.46
 pandas==0.24.1
 pandas-datareader==0.7.0
 parso==0.3.2
 patsy==0.5.1
-pbr==5.1.1
 pickleshare==0.7.5
 Pillow==5.4.1
 prompt-toolkit==2.0.8
@@ -57,7 +55,7 @@ pyflakes==2.0.0
 pyfolio==0.9.0
 Pygments==2.3.1
 pygpu==0.7.6
-pymc3==3.5
+pymc3==3.6
 pyOpenSSL==19.0.0
 pyparsing==2.3.1
 pyreadline==2.1
@@ -76,7 +74,7 @@ tornado==5.1.1
 tqdm==4.29.1
 traitlets==4.3.2
 urllib3==1.24.1
--e git+https://github.com/yihengli/valpy@3e596c2e3d836194416306adf43f7dd19446bb5a#egg=valpy
+-e git+https://github.com/yihengli/valpy@a6b0479f944c4a164d68d0367cef73917eb41430#egg=valpy
 wcwidth==0.1.7
 win-inet-pton==1.0.1
 wincertstore==0.2
