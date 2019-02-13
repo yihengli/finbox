@@ -30,11 +30,46 @@ class ReportBuilder(object):
 </head>
 
 <body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg sticky-top navbar-{nav_font_color}"
+        style="background-color: {nav_bg_color};">
+        <a class="navbar-brand "
+        href="#">
+            <img src="{nav_logo_address}"
+                width="{nav_logo_width}"
+                height="{nav_log_height}"
+                class="d-inline-block align-top"
+                alt="">
+        </a>
+
+        <div class="collapse navbar-collapse"
+            id="navbarTogglerDemo02">
+            <ul class="navbar-nav mr-auto mt-2 mt-lg-0">
+                <li class="nav-item">
+                    <a class="nav-link"
+                    href="#performance">Performance</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link"
+                    href="#returns">Returns</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link"
+                    href="#drawdown">Drawdowns</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link"
+                    href="#positions">Positions</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
   <div class="container">
     <h1>{report_name}</h1>
-    <h2>Performance Table</h2>
+    <h2><a name="performance"></a>Performance Table</h2>
     {table}
-    <h2>Returns Analysis</h2>
+    <h2><a name="returns"></a>Returns Analysis</h2>
       
       <div id="rolling_cum_returns" style="width: 100%;height:400px;"></div>
       <script type="text/javascript">
@@ -82,7 +117,7 @@ class ReportBuilder(object):
           if(chartMRH != null && chartMRH != undefined){{chartMRH.resize();}} }});
       </script>
 
-    <h2>Drawdown Analysis</h2>
+    <h2><a name="drawdown"></a>Drawdown Analysis</h2>
       {table_dd}
       <div id="drawdown_and_underwater" style="width: 100%;height:500px;"></div>
       <script type="text/javascript">
@@ -94,7 +129,7 @@ class ReportBuilder(object):
       </script>
 
     <hr>
-    <h2>Position Analysis</h2>
+    <h2><a name="positions"></a>Position Analysis</h2>
       <div id="exposure_positions" style="width: 100%;height:400px;"></div>
       <script type="text/javascript">
         var chartEXP = echarts.init(document.getElementById('exposure_positions'));
@@ -124,13 +159,13 @@ class ReportBuilder(object):
   </div>
 </body>
 </html>
-""" # noqa E501
+"""  # noqa E501
 
     def __init__(self, strat, benchmark_rets, live_start_date,
                  report_name='Report', custom_interesting_periods=None,
                  custom_interesting_periods_overide=False,
                  returns=None, positions=None, transactions=None,
-                 gross_lev=None):
+                 gross_lev=None, navbar_settings=None):
 
         if strat is not None:
             pyfoliozer = strat.analyzers.getbyname('pyfolio')
@@ -157,6 +192,17 @@ class ReportBuilder(object):
 
         self.periods = custom_interesting_periods
         self.override = custom_interesting_periods_overide
+
+        if navbar_settings is None:
+            navbar_settings = {}
+
+        self.navbar_settings = navbar_settings
+        nav_items = ["nav_font_color", "nav_bg_color", "logo", "logo_width",
+                     "logo_height"]
+        nav_defaults = ["light", "#fff", "https://cdn1.iconfinder.com/data/icons/social-messaging-ui-color-shapes/128/document-circle-blue-512.png", 30, 30]  # noqa E501
+        for item, default in zip(nav_items, nav_defaults):
+            if item not in navbar_settings.keys():
+                self.navbar_settings[item] = default
 
     def build_report(self, dest=None):
         jupyter = True if dest is None else False
@@ -193,6 +239,11 @@ class ReportBuilder(object):
             with open(dest, 'w') as report:
                 report.write(self.template.format(
                     report_name=self.report_name,
+                    nav_font_color=self.navbar_settings["nav_font_color"],
+                    nav_bg_color=self.navbar_settings["nav_bg_color"],
+                    nav_logo_address=self.navbar_settings["logo"],
+                    nav_logo_width=self.navbar_settings["logo_width"],
+                    nav_log_height=self.navbar_settings["logo_height"],
                     table=table,
                     table_dd=table_drawdowns,
                     rct_func=rct_f,
@@ -350,7 +401,7 @@ class ReportBuilder(object):
     $(window).on('resize', function(){{
         if(chartIPA != null && chartIPA != undefined){{chartIPA.resize();}} }});
     </script>
-""" # noqa E501
+"""  # noqa E501
         res = self.get_interactive_interesting_periods(jupyter=False)
         if res is None:
             return ""
