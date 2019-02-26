@@ -1,6 +1,7 @@
 from tqdm import tqdm, tqdm_notebook
 import logging
 import colorlog
+import colorama
 import os
 
 
@@ -56,6 +57,10 @@ class TqdmHandler(logging.StreamHandler):
 
 def get_logger(name='valpy'):
     logger = colorlog.getLogger(name)
+
+    # Disable colorama if in jupyter notebook env
+    if in_ipynb():
+        colorama.deinit()
 
     if logger.hasHandlers():
         logger.handlers.clear()
