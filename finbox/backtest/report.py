@@ -1,7 +1,13 @@
-from . import pyfolio
-from . import plotting
-from IPython.core.display import display
+from collections import OrderedDict
+from typing import Dict, Optional, List
+
+import backtrader as bt
 import pandas as pd
+from IPython.core.display import display
+from pytz import UTC
+
+from . import plotting, pyfolio
+from ..data.equity import get_history
 
 
 class ReportBuilder(object):
@@ -161,11 +167,18 @@ class ReportBuilder(object):
 </html>
 """  # noqa E501
 
-    def __init__(self, strat, benchmark_rets, live_start_date,
-                 report_name='Report', custom_interesting_periods=None,
-                 custom_interesting_periods_overide=False,
-                 returns=None, positions=None, transactions=None,
-                 gross_lev=None, navbar_settings=None):
+    def __init__(self,
+                 strat: bt.strategy.Strategy,
+                 benchmark_rets: Optional[pd.Series] = None,
+                 live_start_date: Optional[str] = None,
+                 report_name: str = 'Report',
+                 custom_interesting_periods: Optional[List[OrderedDict]] = None,  # noqa
+                 custom_interesting_periods_overide: bool = False,
+                 returns: Optional[pd.Series] = None,
+                 positions: Optional[pd.DataFrame] = None,
+                 transactions: Optional[pd.DataFrame] = None,
+                 gross_lev: Optional[pd.DataFrame] = None,
+                 navbar_settings: Optional[Dict] = None):
 
         if strat is not None:
             pyfoliozer = strat.analyzers.getbyname('pyfolio')
@@ -175,6 +188,15 @@ class ReportBuilder(object):
             if returns is None or positions is None or transactions is None:
                 raise Exception("Either a `strat` object or `returns, "
                                 "positions, transactions` should be provided")
+
+        if benchmark_rets is None:
+            fromdate = returns.index.min().strftime('%Y-%m-%d')
+            todate = returns.index.max().strftime('%Y-%m-%d')
+            benchmark_rets = get_history('SPY', fromdate=fromdate,
+                                         todate=todate, set_index=True)['Adj Close'].pct_change()  # noqa
+
+        if isinstance(benchmark_rets.index, type(UTC)):
+            benchmark_rets.index = benchmark_rets.index.tz_localize('UTC')
 
         benchmark_rets = pd.merge(pd.DataFrame(returns),
                                   pd.DataFrame(benchmark_rets),
