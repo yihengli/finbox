@@ -196,6 +196,7 @@ class ReportBuilder(object):
             todate = returns.index.max().strftime('%Y-%m-%d')
             benchmark_rets = get_history('SPY', fromdate=fromdate,
                                          todate=todate, set_index=True)['Adj Close'].pct_change()  # noqa
+            benchmark_rets.name = 'SPY'
 
         if not isinstance(benchmark_rets.index, type(UTC)):
             benchmark_rets.index = benchmark_rets.index.tz_localize('UTC')

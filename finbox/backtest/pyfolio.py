@@ -1,6 +1,9 @@
+import warnings
 from collections import OrderedDict
+from typing import Optional, Dict, Union, List
 
 import backtrader as bt
+import empyrical as ep
 import numpy as np
 import pandas as pd
 from backtrader.analyzers.leverage import GrossLeverage
@@ -8,13 +11,11 @@ from backtrader.analyzers.positions import PositionsValue
 from backtrader.analyzers.timereturn import TimeReturn
 from backtrader.analyzers.transactions import Transactions
 from backtrader.utils.py3 import iteritems
-
-import empyrical as ep
-import warnings
 from pyfolio import timeseries
 from pyfolio.utils import APPROX_BDAYS_PER_MONTH
-from .plotting import print_table
+
 from .interesting_periods import PERIODS
+from .plotting import print_table
 
 STAT_FUNCS_PCT = [
     'Annual return',
@@ -155,10 +156,16 @@ def show_worst_drawdown_table(returns, top=5, jupyter=False, pandas=True):
     return print_table(table, jupyter=jupyter)
 
 
-def show_perf_stats(returns, factor_returns=None, positions=None,
-                    transactions=None, turnover_denom='AGB',
-                    live_start_date=None, bootstrap=False,
-                    header_rows=None, jupyter=False, pandas=False):
+def show_perf_stats(returns: pd.Series,
+                    factor_returns: Union[pd.Series, List[pd.Series], None] = None,  # noqa
+                    positions: Optional[pd.DataFrame] = None,
+                    transactions: Optional[pd.DataFrame] = None,
+                    turnover_denom: str = 'AGB',
+                    live_start_date: Optional[str] = None,
+                    bootstrap: bool = False,
+                    header_rows: Optional[Dict] = None,
+                    jupyter: bool = False,
+                    pandas: bool = False) -> Union[None, str, pd.DataFrame]:
     """
     Prints some performance metrics of the strategy.
 
@@ -173,7 +180,7 @@ def show_perf_stats(returns, factor_returns=None, positions=None,
     returns : pd.Series
         Daily returns of the strategy, noncumulative.
          - See full explanation in tears.create_full_tear_sheet.
-    factor_returns : pd.Series, optional
+    factor_returns : pd.Series or List[pd.Series], optional
         Daily noncumulative returns of the benchmark factor to which betas are
         computed. Usually a benchmark such as market returns.
          - This is in the same style as returns.
@@ -195,6 +202,11 @@ def show_perf_stats(returns, factor_returns=None, positions=None,
          - For more information, see timeseries.perf_stats_bootstrap
     header_rows : dict or OrderedDict, optional
         Extra rows to display at the top of the displayed table.
+    jupyter : bool, optional
+        If True, output None and display contents is adaptable with Jupyter
+        window, otherwise output raw HTML code
+    pandas : bool, optional
+        If True, output format will be dataframe instead of HTML codes
     """
 
     if bootstrap:
@@ -202,6 +214,18 @@ def show_perf_stats(returns, factor_returns=None, positions=None,
     else:
         perf_func = timeseries.perf_stats
 
+    # Benchmark data handler
+    perf_stats_benchmarks = []
+    if factor_returns is not None and isinstance(factor_returns, list):
+        for factor in factor_returns:
+            perf_stats_benchmarks.append(perf_func(factor))
+            perf_stats_benchmarks[-1].name = factor.name
+        factor_returns = factor_returns[0]
+    elif factor_returns is not None and isinstance(factor_returns, pd.Series):
+        perf_stats_benchmarks.append(perf_func(factor_returns))
+        perf_stats_benchmarks[-1].name = factor_returns.name
+
+    # Strategy data handler
     perf_stats_all = perf_func(
         returns,
         factor_returns=factor_returns,
@@ -214,6 +238,7 @@ def show_perf_stats(returns, factor_returns=None, positions=None,
         date_rows['Start date'] = returns.index[0].strftime('%Y-%m-%d')
         date_rows['End date'] = returns.index[-1].strftime('%Y-%m-%d')
 
+    # Break down into In-Sample and Out-of-sample
     if live_start_date is not None:
         live_start_date = ep.utils.get_utc_timestamp(live_start_date)
         returns_is = returns[returns.index < live_start_date]
@@ -255,17 +280,24 @@ def show_perf_stats(returns, factor_returns=None, positions=None,
         perf_stats = pd.concat(OrderedDict([
             ('In-sample', perf_stats_is),
             ('Out-of-sample', perf_stats_oos),
-            ('All', perf_stats_all),
+            ('Strategy', perf_stats_all),
         ]), axis=1)
     else:
         if len(returns.index) > 0:
             date_rows['Total months'] = int(len(returns) /
                                             APPROX_BDAYS_PER_MONTH)
-        perf_stats = pd.DataFrame(perf_stats_all, columns=['Backtest'])
+        perf_stats = pd.DataFrame(perf_stats_all, columns=['Strategy'])
 
+    if perf_stats_benchmarks:
+        for perf_bench in perf_stats_benchmarks:
+            perf_stats = pd.merge(perf_stats, perf_bench.to_frame(),
+                                  left_index=True, right_index=True,
+                                  how='left')
+
+    # Format the numerical outputs
     for column in perf_stats.columns:
         for stat, value in perf_stats[column].iteritems():
-            if stat in STAT_FUNCS_PCT:
+            if stat in STAT_FUNCS_PCT and not np.isnan(value):
                 perf_stats.loc[stat, column] = str(np.round(value * 100,
                                                             1)) + '%'
     if header_rows is None:
