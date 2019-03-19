@@ -1,4 +1,4 @@
-# ValPy
+# FinBox
 
 This is a Python client for a set of Finance related tools.
 

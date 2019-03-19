@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='valpy',
+    name='finbox',
     version='0.0.1',
     description='A python client for finance related jobs',
     author='Yiheng Li',
@@ -19,6 +19,7 @@ setup(
         'pyecharts',
         'pyecharts-snapshot',
         'pyfolio',
-        'tqdm'
+        'tqdm',
+        'seaborn'
     ]
 )
