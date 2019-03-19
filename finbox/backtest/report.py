@@ -180,6 +180,7 @@ class ReportBuilder(object):
                  gross_lev: Optional[pd.DataFrame] = None,
                  navbar_settings: Optional[Dict] = None):
 
+        # Handle Backtrader Strategy Object or directly use return data..
         if strat is not None:
             pyfoliozer = strat.analyzers.getbyname('pyfolio')
             returns, positions, transactions, gross_lev = \
@@ -189,13 +190,14 @@ class ReportBuilder(object):
                 raise Exception("Either a `strat` object or `returns, "
                                 "positions, transactions` should be provided")
 
+        # Handle benchmark related data
         if benchmark_rets is None:
             fromdate = returns.index.min().strftime('%Y-%m-%d')
             todate = returns.index.max().strftime('%Y-%m-%d')
             benchmark_rets = get_history('SPY', fromdate=fromdate,
                                          todate=todate, set_index=True)['Adj Close'].pct_change()  # noqa
 
-        if isinstance(benchmark_rets.index, type(UTC)):
+        if not isinstance(benchmark_rets.index, type(UTC)):
             benchmark_rets.index = benchmark_rets.index.tz_localize('UTC')
 
         benchmark_rets = pd.merge(pd.DataFrame(returns),
@@ -203,6 +205,7 @@ class ReportBuilder(object):
                                   left_index=True, right_index=True,
                                   how="left").fillna(0).iloc[:, 1]
 
+        # Define Attributes
         self.returns = returns
         self.positions = positions
         self.transactions = transactions
