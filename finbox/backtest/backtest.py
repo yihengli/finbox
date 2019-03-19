@@ -1,7 +1,10 @@
-import backtrader as bt
-import pandas as pd
-import numpy as np
+import datetime
 import warnings
+from typing import Dict, List, Optional, Tuple
+
+import backtrader as bt
+import numpy as np
+import pandas as pd
 
 from ..data.equity import get_history
 from .pyfolio import PyFolio
@@ -15,14 +18,19 @@ class BacktestLogger(object):
     """
 
     @staticmethod
-    def log(strategy, txt, dt=None):
-        ''' Logging function for this strategy'''
+    def log(strategy: bt.strategy.Strategy, txt: str,
+            dt: Optional[datetime.date] = None) -> None:
+        """
+        Logging function for this strategy
+        """
         if strategy.params.debug:
             dt = dt or strategy.datas[0].datetime.date(0)
             print('%s, %s' % (dt.isoformat(), txt))
 
     @staticmethod
-    def notify_order(strategy, order, is_warn=True):
+    def notify_order(strategy: bt.strategy.Strategy, order: bt.order.Order,
+                     is_warn: bool = True) -> None:
+
         if order.status in [order.Submitted, order.Accepted]:
             # Buy/Sell order submitted/accepted to/by broker - Nothing to do
             return
@@ -60,7 +68,7 @@ class BacktestLogger(object):
         strategy.order = None
 
     @staticmethod
-    def notify_trade(strategy, trade):
+    def notify_trade(strategy: bt.strategy.Strategy, trade: bt.trade.Trade):
         if not trade.isclosed:
             return
 
@@ -68,7 +76,8 @@ class BacktestLogger(object):
                      (trade.pnl, trade.pnlcomm))
 
 
-def get_customized_pandasfeed(data, col_name, adjclose=True):
+def get_customized_pandasfeed(data: pd.DataFrame, col_name: str,
+                              adjclose: bool = True) -> bt.feeds.PandasData:
     """
     Based on Backtrader's default pandas datafeed, create a customized pandas
     feed with an additional column which can be a predefined signal or
@@ -86,8 +95,8 @@ def get_customized_pandasfeed(data, col_name, adjclose=True):
 
     Returns
     -------
-    [type]
-        [description]
+    bt.feeds.PandasData
+        An pandas-like object that backtrader could use
     """
     df = data.copy()
 
@@ -109,10 +118,15 @@ def get_customized_pandasfeed(data, col_name, adjclose=True):
     return CustomizedPandasData(dataname=df)
 
 
-def build_single_signal_strategy(ticker, signal, is_debug=False,
-                                 max_no_signal_days=1, coc=True, dataset=None,
-                                 initial_cash=100000., adjclose=True,
-                                 commission_settings=None):
+def build_single_signal_strategy(ticker: str,
+                                 signal: pd.DataFrame,
+                                 is_debug: bool = False,
+                                 max_no_signal_days: int = 1,
+                                 coc: bool = True,
+                                 dataset: Optional[pd.DataFrame] = None,
+                                 initial_cash: float = 100000.,
+                                 adjclose: bool = True,
+                                 commission_settings: Optional[List[Dict]] = None) -> bt.strategy.Strategy:  # noqa
     """
     Given a specific ticker (currently only supports Equity) and a signal
     (currently only support daily resolution) with -1, 0 and 1. The backtest
@@ -142,26 +156,18 @@ def build_single_signal_strategy(ticker, signal, is_debug=False,
     adjclose : bool, optional
         Whether to use the dividend/split adjusted close and adjust all values
         according to it.
-    commission_settings : list[dict]
+    commission_settings : List[Dict]
         A list of commission settings including commision, interest, leverage,
         that will be applied to the backtrader engine in order.
 
     Returns
     -------
-    [type]
-        [description]
+    bt.strategy.Strategy
+        The backtrader strategy that contains all the performance details
     """
 
     btlogger = BacktestLogger()
 
-    # class SignalPandasData(bt.feeds.PandasData):
-    #     lines = tuple(["signal"],)
-    #     params = (('datetime', None),) + tuple(
-    #         [(col, -1) for col in bt.feeds.PandasData.datafields[1:]
-    #             + ["signal"]])
-    #     datafields = bt.feeds.PandasData.datafields[1:] + (["signal"])
-
-    # Single Signal Strategy
     class SingleSignalStrategy(bt.Strategy):
         """
         1: step weights instead of default all-in strategy
@@ -176,16 +182,16 @@ def build_single_signal_strategy(ticker, signal, is_debug=False,
         def __init__(self):
             self.no_signal_hold_days = 0
 
-        def log(self, txt, dt=None):
+        def log(self, txt: str, dt: Optional[datetime.date] = None) -> None:
             btlogger.log(self, txt, dt)
 
-        def notify_order(self, order):
+        def notify_order(self, order: bt.order.Order) -> None:
             btlogger.notify_order(self, order)
 
-        def notify_trade(self, trade):
+        def notify_trade(self, trade: bt.trade.Trade) -> None:
             btlogger.notify_trade(self, trade)
 
-        def next(self):
+        def next(self) -> None:
             self.log("CASH = {}".format(self.broker.get_cash()))
             self.log("Portfolio = {}".format(self.broker.get_value()))
 
@@ -205,7 +211,8 @@ def build_single_signal_strategy(ticker, signal, is_debug=False,
             else:
                 self.no_signal_hold_days += 1
 
-    def get_pandas_signal_feed(ticker, signal):
+    def get_pandas_signal_feed(ticker: str, signal: pd.DataFrame)\
+            -> bt.feeds.PandasData:
         """ Get the pandas data feed with a signal column"""
 
         signal.columns = ["signal"]
@@ -243,12 +250,18 @@ def build_single_signal_strategy(ticker, signal, is_debug=False,
     return strat0
 
 
-def build_weights_rebalance_strategy(tickers, weights, datasets=None,
-                                     is_debug=False, lazy_rebalance=False,
-                                     coc=True, dataset=None,
-                                     initial_cash=100000., adjclose=True,
-                                     commission_settings=None, warn_order=True,
-                                     smart_execute=True, weight_slippage=0.):
+def build_weights_rebalance_strategy(tickers: List[str],
+                                     weights: pd.DataFrame,
+                                     datasets: Optional[List[pd.DataFrame]] = None,   # noqa
+                                     is_debug: bool = False,
+                                     lazy_rebalance: bool = False,
+                                     coc: bool = True,
+                                     initial_cash: float = 100000.,
+                                     adjclose: bool = True,
+                                     commission_settings: Optional[List[Dict]] = None,  # noqa
+                                     warn_order: bool = True,
+                                     smart_execute: bool = True,
+                                     weight_slippage: float = 0.) -> bt.strategy.Strategy:  # noqa
     """
     Given a specific ticker (currently only supports Equity) and a signal
     (currently only support daily resolution) with -1, 0 and 1. The backtest
@@ -282,19 +295,34 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
     adjclose : bool, optional
         Whether to use the dividend/split adjusted close and adjust all values
         according to it.
-    commission_settings : list[dict]
+    commission_settings : List[Dict], optional
         A list of commission settings including commision, interest, leverage,
         that will be applied to the backtrader engine in order.
+    warn_order : bool, optional
+        If True, will flag warnings if there are orders rejected through the
+        backtesting process. By default, it's True.
+    smart_execute : bool, optional
+        If True, will smartly allocate moneys to avoid transaction costs or
+        interest costs that make order rejected. However, this is not garanteed
+        to work especially with very high or non-linear cost functions. By
+        default, it's True
+    weight_slippage : float, optional
+        If given, the weights will be adjusted when allocating assets. This is
+        another way to avoid orders get rejected. For example, 0.01 slippage
+        means acutal weights will be adjusted by 1% less to avoid cash not
+        enough case. By default, no slippage will be applied.
 
     Returns
     -------
-    [type]
-        [description]
+    bt.strategy.Strategy
+        The backtrader strategy that contains all the performance details
     """
 
     btlogger = BacktestLogger()
 
-    def get_pandas_weights_feeds(tickers, weights, datasets):
+    def get_pandas_weights_feeds(tickers: List[str], weights: pd.DataFrame,
+                                 datasets: List[pd.DataFrame])\
+            -> Tuple[List[bt.feeds.PandasData], str]:
         """
         Get the a set of pandas data feed with a weights dataframe
         """
@@ -346,16 +374,16 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
             ('weight_slippage', 0.)
         )
 
-        def log(self, txt, dt=None):
+        def log(self, txt: str, dt: Optional[datetime.date] = None) -> None:
             btlogger.log(self, txt, dt)
 
-        def notify_order(self, order):
+        def notify_order(self, order: bt.order.Order) -> None:
             btlogger.notify_order(self, order, warn_order)
 
-        def notify_trade(self, trade):
+        def notify_trade(self, trade: bt.trade.Trade) -> None:
             btlogger.notify_trade(self, trade)
 
-        def _is_first_day(self):
+        def _is_first_day(self) -> bool:
             """
             Return True, if the function was executed as the first day of
             backtesting. It's necessary for `lazy_rebalance` when first day
@@ -368,7 +396,7 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
                 return dt == self.params.fromdate
             return False
 
-        def _get_delta_value_and_cost(self, ticker, cur_w):
+        def _get_delta_value_and_cost(self, ticker: str, cur_w: float) -> Tuple[float]:  # noqa
             """
             Given a required current weight, calculate how much values need to
             change to maintain the weights as reuqired
@@ -408,7 +436,7 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
 
             return delta_value, cost, price
 
-        def _build_action_list(self):
+        def _build_action_list(self) -> List[Dict]:
             """
             Build the action list object, where each action item contains the
             delta weights, delta values and related delta costs information for
@@ -429,7 +457,7 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
 
             return action_list
 
-        def report_actual_weights(self, tickers):
+        def report_actual_weights(self, tickers: List[str]) -> None:
             """
             Report the realized current weights of each asset
             """
@@ -441,7 +469,7 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
                 cur_w = cur_value / self.broker.getvalue()
                 self.log("   {}: {:.2%}".format(ticker, cur_w))
 
-        def smart_execution(self, action_list):
+        def smart_execution(self, action_list: List[Dict]) -> None:
             """
             Smartly execute a list of actions:
             1. Sell before Buy, to make sure buy orders can be funded
@@ -478,7 +506,8 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
 
                     self.smart_order_with_action(action, clear_cost_per_order)
 
-        def smart_order_with_action(self, action, additional_cost):
+        def smart_order_with_action(self, action: Dict,
+                                    additional_cost: float) -> bt.order.Order:
             """
             Smartly execute the order to buy or sell with given value while
             also considering related costs
@@ -518,7 +547,7 @@ def build_weights_rebalance_strategy(tickers, weights, datasets=None,
                           order.created.price))
             return order
 
-        def next(self):
+        def next(self) -> None:
             self.log("CASH: {:.2f} | Portfolio {:.2f}".format(
                 self.broker.get_cash(), self.broker.get_value()))
 
