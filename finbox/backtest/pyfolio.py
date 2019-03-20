@@ -1,6 +1,6 @@
 import warnings
 from collections import OrderedDict
-from typing import Optional, Dict, Union, List
+from typing import Optional, Dict, Union, List, Tuple, Callable
 
 import backtrader as bt
 import empyrical as ep
@@ -323,14 +323,13 @@ def show_perf_stats(returns: pd.Series,
     return print_table(table, header_rows=header_rows, jupyter=jupyter)
 
 
-def get_rolling_returns(returns,
-                        factor_returns=None,
-                        live_start_date=None,
-                        logy=False,
-                        cone_std=None,
-                        legend_loc='best',
-                        volatility_match=False,
-                        cone_function=timeseries.forecast_cone_bootstrap):
+def get_rolling_returns(returns: pd.Series,
+                        factor_returns: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
+                        live_start_date: Optional[str] = None,
+                        logy: bool = False,
+                        cone_std: Union[float, Tuple, None] = None,
+                        volatility_match: bool = False,
+                        cone_function: Callable = timeseries.forecast_cone_bootstrap) -> Dict:  # noqa
     """
     Plots cumulative rolling returns versus some benchmarks'.
 
@@ -345,7 +344,7 @@ def get_rolling_returns(returns,
     returns : pd.Series
         Daily returns of the strategy, noncumulative.
          - See full explanation in tears.create_full_tear_sheet.
-    factor_returns : pd.Series, optional
+    factor_returns : pd.Series or List[pd.Series], optional
         Daily noncumulative returns of the benchmark factor to which betas are
         computed. Usually a benchmark such as market returns.
          - This is in the same style as returns.
@@ -358,8 +357,6 @@ def get_rolling_returns(returns,
         If float, The standard deviation to use for the cone plots.
         If tuple, Tuple of standard deviation values to use for the cone plots
          - See timeseries.forecast_cone_bounds for more details.
-    legend_loc : matplotlib.loc, optional
-        The location of the legend on the plot.
     volatility_match : bool, optional
         Whether to normalize the volatility of the returns to those of the
         benchmark returns. This helps compare strategies with different
@@ -375,8 +372,13 @@ def get_rolling_returns(returns,
 
     Returns
     -------
-    ax : matplotlib.Axes
-        The axes that were plotted on.
+    Dict
+         {
+            'cum_factor_returns': Union[None, pd.Series, List[pd.Series]],
+            'is_cum_returns': pd.Series,
+            'oos_cum_returns': Union[None, pd.Series],
+            'cone_bounds': Union[None, pd.DataFrame]
+        }
     """
 
     if volatility_match and factor_returns is None:
@@ -388,10 +390,22 @@ def get_rolling_returns(returns,
 
     cum_rets = ep.cum_returns(returns, 1.0)
 
-    if factor_returns is not None:
+    # Construct benchmark returns
+    if factor_returns is not None and isinstance(factor_returns, pd.Series):
         cum_factor_returns = ep.cum_returns(
             factor_returns[cum_rets.index], 1.0)
+        cum_factor_returns.name = factor_returns.name
+    elif factor_returns is not None and isinstance(factor_returns, list):
+        cum_factor_returns = list(
+            map(lambda x: ep.cum_returns(x[cum_rets.index], 1.0),
+                factor_returns))
+        for a, b in zip(cum_factor_returns, factor_returns):
+            a.name = b.name
+    else:
+        cum_factor_returns = None
 
+    # Construct In-Sample and Out-of-Sample returns, if `live_start_date` not
+    # given, then only In-Sample is constructed
     if live_start_date is not None:
         live_start_date = ep.utils.get_utc_timestamp(live_start_date)
         is_cum_returns = cum_rets.loc[cum_rets.index < live_start_date]
@@ -400,8 +414,8 @@ def get_rolling_returns(returns,
         is_cum_returns = cum_rets
         oos_cum_returns = pd.Series([])
 
+    # Construct prediction intervals for the out-of-sample returns
     if len(oos_cum_returns) > 0:
-
         if cone_std is not None:
             if isinstance(cone_std, (float, int)):
                 cone_std = [cone_std]
@@ -418,16 +432,15 @@ def get_rolling_returns(returns,
     else:
         cone_bounds = None
 
-    is_cum_returns = pd.Series(is_cum_returns, index=cum_factor_returns.index)
-
+    is_cum_returns = pd.Series(is_cum_returns, index=cum_rets.index)
     if len(oos_cum_returns) > 0:
         oos_cum_returns = pd.Series(oos_cum_returns,
-                                    index=cum_factor_returns.index)
+                                    index=cum_rets.index)
     else:
         oos_cum_returns = None
 
     if cone_bounds is not None:
-        cone_bounds = pd.DataFrame(cone_bounds, index=cum_factor_returns.index)
+        cone_bounds = pd.DataFrame(cone_bounds, index=cum_rets.index)
 
     return {
         'cum_factor_returns': cum_factor_returns,
