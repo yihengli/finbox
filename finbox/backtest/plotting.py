@@ -8,7 +8,7 @@ import pandas as pd
 from matplotlib.axes import Axes
 from pyecharts import Grid, Line
 from pyecharts.chart import Chart
-from pyfolio import pos, timeseries
+from pyfolio import timeseries
 from pyfolio.utils import clip_returns_to_benchmark
 
 from . import pyfolio as pf
@@ -82,7 +82,7 @@ def plot_rolling_returns(returns: pd.Series,
         return _pe.plot_interactive_rolling_returns(returns, factor_returns,
                                                     live_start_date, cone_std)
     else:
-        raise NotImplementedError('`chart_type` cano only be `matplotlib` '
+        raise NotImplementedError('`chart_type` can only be `matplotlib` '
                                   'or `echarts`')
 
 
@@ -113,7 +113,7 @@ def plot_rolling_sharpes(returns: pd.Series,
     elif chart_type == 'echarts':
         return _pe.plot_interactive_rolling_sharpes(returns, factor_returns)
     else:
-        raise NotImplementedError('`chart_type` cano only be `matplotlib` '
+        raise NotImplementedError('`chart_type` can only be `matplotlib` '
                                   'or `echarts`')
 
 
@@ -142,7 +142,7 @@ def plot_drawdown_underwater(returns: pd.Series, top: int = 5,
     elif chart_type == 'echarts':
         return _pe.plot_interactive_drawdown_underwater(returns, top)
     else:
-        raise NotImplementedError('`chart_type` cano only be `matplotlib` '
+        raise NotImplementedError('`chart_type` can only be `matplotlib` '
                                   'or `echarts`')
 
 
@@ -172,7 +172,7 @@ def plot_rolling_betas(returns: pd.Series,
     elif chart_type == 'echarts':
         return _pe.plot_interactive_rolling_betas(returns, factor_returns)
     else:
-        raise NotImplementedError('`chart_type` cano only be `matplotlib` '
+        raise NotImplementedError('`chart_type` can only be `matplotlib` '
                                   'or `echarts`')
 
 
@@ -202,7 +202,7 @@ def plot_rolling_vol(returns: pd.Series,
     elif chart_type == 'echarts':
         return _pe.plot_interactive_rolling_vol(returns, factor_returns)
     else:
-        raise NotImplementedError('`chart_type` cano only be `matplotlib` '
+        raise NotImplementedError('`chart_type` can only be `matplotlib` '
                                   'or `echarts`')
 
 
@@ -227,54 +227,61 @@ def plot_monthly_heatmap(returns: pd.Series, chart_type: str = 'matplotlib') -> 
     elif chart_type == 'echarts':
         return _pe.plot_interactive_monthly_heatmap(returns)
     else:
-        raise NotImplementedError('`chart_type` cano only be `matplotlib` '
+        raise NotImplementedError('`chart_type` can only be `matplotlib` '
                                   'or `echarts`')
 
 
-def plot_interactive_exposures(returns, positions):
+def plot_exposures(returns: pd.Series, positions: pd.DataFrame,
+                   chart_type: str = 'matplotlib') -> Union[Axes, Chart]:
+    """
+    Plots a cake chart of the long and short exposure.
 
-    pos_no_cash = positions.drop('cash', axis=1)
+    Parameters
+    ----------
+    returns : pd.Series
+        Daily returns of the strategy, noncumulative.
+    positions : pd.DataFrame
+        Portfolio allocation of positions.
+    chart_type : str, optional
+        Plot Engine (the default is 'matplotlib', otherwise 'echarts')
 
-    l_exp = pos_no_cash[pos_no_cash > 0].sum(axis=1) / positions.sum(axis=1)
-    s_exp = pos_no_cash[pos_no_cash < 0].sum(axis=1) / positions.sum(axis=1)
-    net_exp = pos_no_cash.sum(axis=1) / positions.sum(axis=1)
-
-    line = Line("Exposure")
-    attr = l_exp.index.strftime("%Y-%m-%d")
-
-    line.add("Long", attr, np.round(l_exp, 3).tolist(),
-             is_datazoom_show=True, datazoom_range=[0, 100],
-             is_step=True, area_opacity=0.7, tooltip_trigger="axis",
-             is_symbol_show=False, line_opacity=0)
-    line.add("Short", attr, np.round(s_exp, 3).tolist(),
-             is_datazoom_show=True, datazoom_range=[0, 100],
-             is_step=True, area_opacity=0.7, tooltip_trigger="axis",
-             is_symbol_show=False, line_opacity=0)
-    line.add("Net", attr, np.round(net_exp, 3).tolist(),
-             is_datazoom_show=True, datazoom_range=[0, 100],
-             tooltip_trigger="axis", is_symbol_show=False)
-
-    line._option['color'][0] = PlottingConfig.GREEN
-    line._option['color'][1] = PlottingConfig.ORANGE
-    line._option['color'][2] = 'black'
-    return line
+    Returns
+    -------
+    Union[mpl.axes.Axes, pyecharts.chart.Chart]
+        Either matplotlib plots or Echarts plot object
+    """
+    if chart_type == 'matplotlib':
+        return _pm.plot_exposures(returns, positions)
+    elif chart_type == 'echarts':
+        return _pe.plot_interactive_exposures(returns, positions)
+    else:
+        raise NotImplementedError('`chart_type` can only be `matplotlib` '
+                                  'or `echarts`')
 
 
-def plot_interactive_exposures_by_asset(positions):
-    pos_alloc = pos.get_percent_alloc(positions)
-    pos_alloc_no_cash = pos_alloc.drop('cash', axis=1)
+def plot_exposures_by_assets(positions: pd.DataFrame, chart_type: str = 'matplotlib') -> Union[Axes, Chart]:  # noqa
+    """
+    plots the exposures of positions of all time.
 
-    attr = pos_alloc_no_cash.index.strftime("%Y-%m-%d")
+    Parameters
+    ----------
+    positions : pd.DataFrame
+        Portfolio allocation of positions.
+    chart_type : str, optional
+        Plot Engine (the default is 'matplotlib', otherwise 'echarts')
 
-    line = Line("Exposures By Asset")
-
-    for col in pos_alloc_no_cash.columns:
-        line.add(col, attr, np.round(pos_alloc_no_cash[col], 2).tolist(),
-                 is_more_utils=True, is_datazoom_show=True,
-                 line_width=2, line_opacity=0.7,
-                 datazoom_range=[0, 100], tooltip_trigger="axis")
-
-    return line
+    Returns
+    -------
+    Union[mpl.axes.Axes, pyecharts.chart.Chart]
+        Either matplotlib plots or Echarts plot object
+    """
+    if chart_type == 'matplotlib':
+        return _pm.plot_exposures_by_assets(positions)
+    elif chart_type == 'echarts':
+        return _pe.plot_interactive_exposures_by_asset(positions)
+    else:
+        raise NotImplementedError('`chart_type` can only be `matplotlib` '
+                                  'or `echarts`')
 
 
 def plot_interactive_gross_leverage(positions):

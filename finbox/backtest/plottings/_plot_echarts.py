@@ -12,6 +12,7 @@ from pyfolio.utils import APPROX_BDAYS_PER_MONTH
 
 from .. import pyfolio as pf
 from ._plot_meta import PlottingConfig
+from pyfolio import pos
 
 
 class Number:
@@ -408,3 +409,57 @@ def plot_interactive_monthly_heatmap(returns):
         tooltip_formatter="{c}%"
     )
     return heatmap
+
+
+def plot_interactive_exposures(returns: pd.Series,
+                               positions: pd.DataFrame) -> Chart:
+    """
+    Plots a cake chart of the long and short exposure.
+    """
+
+    pos_no_cash = positions.drop('cash', axis=1)
+
+    l_exp = pos_no_cash[pos_no_cash > 0].sum(axis=1) / positions.sum(axis=1)
+    s_exp = pos_no_cash[pos_no_cash < 0].sum(axis=1) / positions.sum(axis=1)
+    net_exp = pos_no_cash.sum(axis=1) / positions.sum(axis=1)
+
+    line = Line("Exposure")
+    attr = l_exp.index.strftime("%Y-%m-%d")
+
+    line.add("Long", attr, np.round(l_exp, 3).tolist(),
+             is_datazoom_show=True, datazoom_range=[0, 100],
+             is_step=True, area_opacity=0.7, tooltip_trigger="axis",
+             is_symbol_show=False, line_opacity=0)
+    line.add("Short", attr, np.round(s_exp, 3).tolist(),
+             is_datazoom_show=True, datazoom_range=[0, 100],
+             is_step=True, area_opacity=0.7, tooltip_trigger="axis",
+             is_symbol_show=False, line_opacity=0)
+    line.add("Net", attr, np.round(net_exp, 3).tolist(),
+             is_datazoom_show=True, datazoom_range=[0, 100],
+             tooltip_trigger="axis", is_symbol_show=False)
+
+    line._option['color'][0] = PlottingConfig.GREEN
+    line._option['color'][1] = PlottingConfig.ORANGE
+    line._option['color'][2] = 'black'
+
+    return line
+
+
+def plot_interactive_exposures_by_asset(positions):
+    """
+    plots the exposures of the held positions of all time.
+    """
+
+    pos_alloc = pos.get_percent_alloc(positions)
+    pos_alloc_no_cash = pos_alloc.drop('cash', axis=1)
+
+    attr = pos_alloc_no_cash.index.strftime("%Y-%m-%d")
+    line = Line("Exposures By Asset")
+
+    for col in pos_alloc_no_cash.columns:
+        line.add(col, attr, np.round(pos_alloc_no_cash[col], 2).tolist(),
+                 is_more_utils=True, is_datazoom_show=True,
+                 line_width=2, line_opacity=0.7, is_symbol_show=False,
+                 datazoom_range=[0, 100], tooltip_trigger="axis")
+
+    return line

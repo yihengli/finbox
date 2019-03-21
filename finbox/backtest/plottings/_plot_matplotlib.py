@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib.axes import Axes
 from matplotlib.ticker import FuncFormatter
-from pyfolio import plotting, utils
+from pyfolio import plotting, utils, pos
 from pyfolio.utils import APPROX_BDAYS_PER_MONTH
 
 from .. import pyfolio as pf
@@ -209,4 +209,40 @@ def plot_monthly_heatmap(returns: pd.Series,
     """
     Plots a heatmap of returns by month.
     """
-    return plotting.plot_monthly_returns_heatmap(returns)
+    return plotting.plot_monthly_returns_heatmap(returns, ax=ax)
+
+
+def plot_exposures(returns: pd.Series, positions: pd.DataFrame,
+                   ax: Optional[Axes] = None) -> Axes:
+    """
+    Plots a cake chart of the long and short exposure.
+    """
+    return plotting.plot_exposures(returns, positions, ax=ax)
+
+
+def plot_exposures_by_assets(positions: pd.DataFrame,
+                             ax: Optional[Axes] = None) -> Axes:
+    """
+    plots the exposures of the held positions of all time.
+    """
+    pos_alloc = pos.get_percent_alloc(positions)
+    pos_alloc_no_cash = pos_alloc.drop('cash', axis=1)
+
+    if ax is None:
+        ax = plt.gca()
+
+    pos_alloc_no_cash.plot(
+        title='Portfolio allocation over time',
+        alpha=0.5, ax=ax)
+
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0 + box.height * 0.1,
+                     box.width, box.height * 0.9])
+
+    # Put a legend below current axis
+    ax.legend(loc='upper center', frameon=True, framealpha=0.5,
+              bbox_to_anchor=(0.5, -0.14), ncol=5)
+
+    ax.set_ylabel('Exposure by holding')
+    ax.set_xlabel('')
+    return ax
