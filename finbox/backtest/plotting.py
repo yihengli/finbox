@@ -4,9 +4,9 @@ from enum import Enum
 from typing import List, Optional, Union
 
 import empyrical as ep
+import matplotlib as mpl
 import numpy as np
 import pandas as pd
-from IPython.core.display import HTML, display
 from matplotlib.axes import Axes
 from pyecharts import Grid, HeatMap, Line
 from pyecharts.chart import Chart
@@ -15,6 +15,9 @@ from pyfolio.utils import APPROX_BDAYS_PER_MONTH, clip_returns_to_benchmark
 
 from . import pyfolio as pf
 from .plottings import _plot_echarts as _pe
+from .plottings import _plot_matplotlib as _pm
+
+mpl.style.use('seaborn-paper')
 
 
 class ChartType(Enum):
@@ -44,35 +47,6 @@ class PlottingConfig:
         "tooltip_trigger": "axis",
         "is_symbol_show": False
     }
-
-
-def print_table(table, float_format='{0:.2f}'.format, formatters=None,
-                jupyter=False, header_rows=None):
-    html = table.to_html(float_format=float_format, formatters=formatters)
-
-    if header_rows is not None:
-        # Count the number of columns for the text to span
-        n_cols = html.split('<thead>')[1].split('</thead>')[0].count('<th>')
-
-        # Generate the HTML for the extra rows
-        rows = ''
-        for name, value in header_rows.items():
-            rows += ('\n    <tr style="text-align: right;"><th>%s</th>' +
-                     '<td colspan=%d>%s</td></tr>') % (name, n_cols, value)
-
-        # Inject the new HTML
-        html = html.replace('<thead>', '<thead>' + rows)
-
-    if jupyter:
-        display(HTML(html))
-    else:
-        html = html.replace(
-            '<table border="1" class="dataframe">',
-            '<table class="table table-sm table-hover table-striped">'
-        )
-        html = html.replace(' style="text-align: right;', '')
-
-        return html
 
 
 def plot_rolling_returns(returns: pd.Series,
@@ -106,11 +80,12 @@ def plot_rolling_returns(returns: pd.Series,
     Union[mpl.axes.Axes, pyecharts.chart.Chart]
         Either matplotlib plots or Echarts plot object
     """
-    if chart_type == ChartType['matplotlib']:
-        pass
-    elif chart_type == ChartType['echarts']:
-        return _pe.plot_interactive_rolling_returns(
-            returns, factor_returns, live_start_date, cone_std)
+    if ChartType[chart_type] == ChartType['matplotlib']:
+        return _pm.plot_rolling_returns(returns, factor_returns,
+                                        live_start_date, cone_std)
+    elif ChartType[chart_type] == ChartType['echarts']:
+        return _pe.plot_interactive_rolling_returns(returns, factor_returns,
+                                                    live_start_date, cone_std)
 
 
 def plot_interactive_rolling_sharpes(returns,

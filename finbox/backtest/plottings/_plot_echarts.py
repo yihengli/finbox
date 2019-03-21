@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -14,10 +14,10 @@ class Number:
     pass
 
 
-def plot_interactive_rolling_returns(returns,
-                                     factor_returns=None,
-                                     live_start_date=None,
-                                     cone_std=None):
+def plot_interactive_rolling_returns(returns: pd.Series,
+                                     factor_returns: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
+                                     live_start_date: Optional[str] = None,
+                                     cone_std: Optional[List[float]] = None) -> Chart:  # noqa
     """
     Plots cumulative rolling returns versus some benchmarks'.
 
@@ -147,8 +147,11 @@ def plot_interactive_rolling_returns(returns,
                                     1]['stack'] = 'CI{}'.format(ci_index)
             ci_index += 2
 
-        chart._option['color'][color_index] = area_color
-        return color_index + 1
+        if len(u_list) > 0:
+            chart._option['color'][color_index] = area_color
+            return color_index + 1
+        else:
+            return color_index
 
     # Get calculated returns series
 

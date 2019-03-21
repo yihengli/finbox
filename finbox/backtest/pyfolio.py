@@ -1,6 +1,6 @@
 import warnings
 from collections import OrderedDict
-from typing import Optional, Dict, Union, List, Tuple, Callable
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import backtrader as bt
 import empyrical as ep
@@ -11,11 +11,11 @@ from backtrader.analyzers.positions import PositionsValue
 from backtrader.analyzers.timereturn import TimeReturn
 from backtrader.analyzers.transactions import Transactions
 from backtrader.utils.py3 import iteritems
+from IPython.core.display import HTML, display
 from pyfolio import timeseries
 from pyfolio.utils import APPROX_BDAYS_PER_MONTH
 
 from .interesting_periods import PERIODS
-from .plotting import print_table
 
 STAT_FUNCS_PCT = [
     'Annual return',
@@ -154,6 +154,35 @@ def show_worst_drawdown_table(returns, top=5, jupyter=False, pandas=True):
         return table
 
     return print_table(table, jupyter=jupyter)
+
+
+def print_table(table, float_format='{0:.2f}'.format, formatters=None,
+                jupyter=False, header_rows=None):
+    html = table.to_html(float_format=float_format, formatters=formatters)
+
+    if header_rows is not None:
+        # Count the number of columns for the text to span
+        n_cols = html.split('<thead>')[1].split('</thead>')[0].count('<th>')
+
+        # Generate the HTML for the extra rows
+        rows = ''
+        for name, value in header_rows.items():
+            rows += ('\n    <tr style="text-align: right;"><th>%s</th>' +
+                     '<td colspan=%d>%s</td></tr>') % (name, n_cols, value)
+
+        # Inject the new HTML
+        html = html.replace('<thead>', '<thead>' + rows)
+
+    if jupyter:
+        display(HTML(html))
+    else:
+        html = html.replace(
+            '<table border="1" class="dataframe">',
+            '<table class="table table-sm table-hover table-striped">'
+        )
+        html = html.replace(' style="text-align: right;', '')
+
+        return html
 
 
 def show_perf_stats(returns: pd.Series,
