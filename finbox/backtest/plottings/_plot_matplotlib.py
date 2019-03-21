@@ -143,3 +143,17 @@ def plot_drawdown_underwater(returns: pd.Series, top: int = 5,
 
     fig.tight_layout()
     return axes
+
+
+def plot_rolling_betas(returns: pd.Series, factor_returns: pd.Series,
+                       ax: Optional[Axes] = None) -> Axes:
+    """
+    Plots the rolling 6-month and 12-month beta versus date.
+    """
+    if factor_returns is None:
+        raise Exception('`factor_returns` must be provided when calculating '
+                        'betas')
+    elif isinstance(factor_returns, list):
+        factor_returns = factor_returns[0]
+
+    return plotting.plot_rolling_beta(returns, factor_returns, ax=ax)

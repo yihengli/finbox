@@ -1,12 +1,13 @@
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
+import empyrical as ep
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from pyecharts import Line, Grid
+from pyecharts import Grid, Line
 from pyecharts.chart import Chart
-import empyrical as ep
+from pyfolio.utils import APPROX_BDAYS_PER_MONTH
 
 from .. import pyfolio as pf
 from ._plot_meta import PlottingConfig
@@ -295,3 +296,37 @@ def plot_interactive_drawdown_underwater(returns: pd.Series, top: int = 5) -> Ch
     grid._option["axisPointer"] = {"link": {"xAxisIndex": 'all'}}
 
     return grid
+
+
+def plot_interactive_rolling_betas(returns: pd.Series,
+                                   factor_returns: pd.Series) -> Chart:
+    """
+    Plots the rolling 6-month and 12-month beta versus date.
+    """
+    if factor_returns is None:
+        raise Exception('`factor_returns` must be provided when calculating '
+                        'betas')
+    elif isinstance(factor_returns, list):
+        factor_returns = factor_returns[0]
+
+    rb_1 = pf.timeseries.rolling_beta(
+        returns, factor_returns, rolling_window=APPROX_BDAYS_PER_MONTH * 6)
+    rb_2 = pf.timeseries.rolling_beta(
+        returns, factor_returns, rolling_window=APPROX_BDAYS_PER_MONTH * 12)
+
+    attr = rb_1.index.strftime("%Y-%m-%d")
+    valid_ratio = np.round(rb_2.count() / rb_2.shape[0], 3)
+
+    line = Line("Rolling Betas")
+    line.add("6-Month", attr, np.round(rb_1, 3).tolist(),
+             is_datazoom_show=True, mark_line=["average"],
+             datazoom_range=[(1 - valid_ratio) * 100, 100],
+             **PlottingConfig.LINE_KWARGS)
+    line.add("12-Month", attr, np.round(rb_2, 3).tolist(),
+             mark_line=["average"], **PlottingConfig.BENCH_KWARGS)
+
+    line._option['color'][0] = PlottingConfig.CI_AREA_COLOR
+    line._option['color'][1] = "grey"
+    line._option["series"][0]["markLine"]["lineStyle"] = {"width": 2}
+
+    return line
