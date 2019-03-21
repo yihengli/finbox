@@ -1,10 +1,12 @@
+import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from pyecharts import Line
+from pyecharts import Line, Grid
 from pyecharts.chart import Chart
+import empyrical as ep
 
 from .. import pyfolio as pf
 from ._plot_meta import PlottingConfig
@@ -229,3 +231,67 @@ def plot_interactive_rolling_sharpes(returns: pd.Series,
     line._option["series"][color_index]["markLine"]["lineStyle"] = {"width": 2}
 
     return line
+
+
+def plot_interactive_drawdown_underwater(returns: pd.Series, top: int = 5) -> Chart:  # noqa
+    """
+    Plots how far underwaterr returns are over time, or plots current
+    drawdown vs. date.
+    """
+    # Get underwater data and max drawdown tables
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        df_cum_rets = ep.cum_returns(returns, starting_value=1.0)
+        df_drawdowns = pf.timeseries.gen_drawdown_table(returns, top=top)
+        running_max = np.maximum.accumulate(df_cum_rets)
+        underwater = -100 * ((running_max - df_cum_rets) / running_max)
+
+    line = Line("Top 5 Drawdowns")
+    attr = df_cum_rets.index.strftime("%Y-%m-%d")
+
+    # Plot out the returns
+    line.add("Cumulative Returns", attr, np.round(df_cum_rets, 3).tolist(),
+             line_color='#fff', is_datazoom_show=True, datazoom_range=[0, 100],
+             yaxis_min=0.7, datazoom_xaxis_index=[0, 1],
+             **PlottingConfig.BENCH_KWARGS)
+
+    line._option["color"][0] = PlottingConfig.ORANGE
+    line._option["series"][0]["markArea"] = {"data": []}
+
+    # Highligh each drawdown area
+    color_sets = ['#355C7D', '#6C5B7B', '#C06C84', '#F67280', '#F8B195']
+    for i, (peak, recovery) in df_drawdowns[
+            ['Peak date', 'Recovery date']].iterrows():
+        if pd.isnull(recovery):
+            recovery = returns.index[-1]
+        peak = peak.strftime("%Y-%m-%d")
+        recovery = recovery.strftime("%Y-%m-%d")
+
+        line._option["series"][0]["markArea"]["data"].append(
+            [{
+                "name": str(i+1),
+                "xAxis": peak,
+                "itemStyle": {
+                    "opacity": 0.9,
+                    "color": color_sets[i]
+                }
+            }, {
+                "xAxis": recovery
+            }]
+        )
+
+    # Separately plot out underwaters
+    line2 = Line("Underwater Plot", title_top="50%")
+    line2.add("DrawDown", attr, np.round(underwater, 3).tolist(),
+              is_datazoom_show=True, area_color=PlottingConfig.ORANGE,
+              yaxis_formatter='%', area_opacity=0.5, datazoom_range=[0, 100],
+              legend_top="50%", **PlottingConfig.BENCH_KWARGS)
+
+    grid = Grid()
+    grid.add(line, grid_bottom="57%")
+    grid.add(line2, grid_top="57%")
+
+    grid._option["color"][1] = PlottingConfig.ORANGE
+    grid._option["axisPointer"] = {"link": {"xAxisIndex": 'all'}}
+
+    return grid

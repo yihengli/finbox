@@ -1,11 +1,12 @@
-from typing import List, Optional, Union
+import warnings
+from typing import List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from matplotlib.axes import Axes
 from matplotlib.ticker import FuncFormatter
-from pyfolio import utils
+from pyfolio import plotting, utils
 
 from .. import pyfolio as pf
 
@@ -123,3 +124,22 @@ def plot_rolling_sharpes(returns: pd.Series,
 
     ax.legend(loc='best', frameon=True, framealpha=0.5)
     return ax
+
+
+def plot_drawdown_underwater(returns: pd.Series, top: int = 5,
+                             axes: Optional[Tuple[Axes, Axes]] = None) -> Axes:
+    """
+    Plots how far underwaterr returns are over time, or plots current
+    drawdown vs. date.
+    """
+    if axes is None:
+        fig, axes = plt.subplots(2, 1, sharex=True)
+
+    # Get underwater data and max drawdown tables
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plotting.plot_drawdown_periods(returns, top, axes[0])
+        plotting.plot_drawdown_underwater(returns, axes[1])
+
+    fig.tight_layout()
+    return axes
