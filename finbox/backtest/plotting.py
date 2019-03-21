@@ -1,5 +1,4 @@
 import warnings
-from datetime import date
 from typing import List, Optional, Union
 
 import empyrical as ep
@@ -7,7 +6,7 @@ import matplotlib as mpl
 import numpy as np
 import pandas as pd
 from matplotlib.axes import Axes
-from pyecharts import Grid, HeatMap, Line
+from pyecharts import Grid, Line
 from pyecharts.chart import Chart
 from pyfolio import pos, timeseries
 from pyfolio.utils import clip_returns_to_benchmark
@@ -207,41 +206,29 @@ def plot_rolling_vol(returns: pd.Series,
                                   'or `echarts`')
 
 
-def plot_interactive_monthly_heatmap(returns):
+def plot_monthly_heatmap(returns: pd.Series, chart_type: str = 'matplotlib') -> Union[Axes, Chart]:  # noqa
+    """
+    Plots a heatmap of returns by month.
 
-    monthly_ret_table = ep.aggregate_returns(returns, 'monthly')
-    monthly_ret_table = monthly_ret_table.unstack().round(3)
+    Parameters
+    ----------
+    returns : pd.Series
+        Daily returns of the strategy, noncumulative.
+    chart_type : str, optional
+        Plot Engine (the default is 'matplotlib', otherwise 'echarts')
 
-    monthly_ret_table = np.round(monthly_ret_table * 100, 2)
-    lim = lim = max(np.max(np.abs(monthly_ret_table)))
-
-    y_axis = [date(1000, i, 1).strftime('%b') for i in range(1, 13)]
-    x_axis = [str(y) for y in monthly_ret_table.index.tolist()]
-    data = data = [[x_axis[i], y_axis[j], monthly_ret_table.values[i][j]]
-                   for i in range(monthly_ret_table.shape[0])
-                   for j in range(monthly_ret_table.shape[1])]
-
-    heatmap = HeatMap("Monthly Returns")
-    heatmap.add(
-        "Monthly Returns",
-        x_axis,
-        y_axis,
-        data,
-        is_visualmap=True,
-        is_datazoom_show=True,
-        datazoom_orient='horizontal',
-        datazoom_range=[0, 100],
-        visual_range=[-lim, lim],
-        visual_text_color="#000",
-        visual_range_color=['#D73027', '#FFFFBF', '#1A9641'],
-        visual_orient="vertical",
-        is_toolbox_show=False,
-        is_label_show=True,
-        label_pos="inside",
-        label_text_color="black",
-        tooltip_formatter="{c}%"
-    )
-    return heatmap
+    Returns
+    -------
+    Union[mpl.axes.Axes, pyecharts.chart.Chart]
+        Either matplotlib plots or Echarts plot object
+    """
+    if chart_type == 'matplotlib':
+        return _pm.plot_monthly_heatmap(returns)
+    elif chart_type == 'echarts':
+        return _pe.plot_interactive_monthly_heatmap(returns)
+    else:
+        raise NotImplementedError('`chart_type` cano only be `matplotlib` '
+                                  'or `echarts`')
 
 
 def plot_interactive_exposures(returns, positions):

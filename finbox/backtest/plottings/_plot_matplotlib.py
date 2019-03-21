@@ -202,3 +202,11 @@ def plot_rolling_vol(returns: pd.Series,
     ax.legend(loc='best', frameon=True, framealpha=0.5)
 
     return ax
+
+
+def plot_monthly_heatmap(returns: pd.Series,
+                         ax: Optional[Axes] = None) -> Axes:
+    """
+    Plots a heatmap of returns by month.
+    """
+    return plotting.plot_monthly_returns_heatmap(returns)
