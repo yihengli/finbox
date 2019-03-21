@@ -7,6 +7,7 @@ import seaborn as sns
 from matplotlib.axes import Axes
 from matplotlib.ticker import FuncFormatter
 from pyfolio import plotting, utils
+from pyfolio.utils import APPROX_BDAYS_PER_MONTH
 
 from .. import pyfolio as pf
 
@@ -157,3 +158,47 @@ def plot_rolling_betas(returns: pd.Series, factor_returns: pd.Series,
         factor_returns = factor_returns[0]
 
     return plotting.plot_rolling_beta(returns, factor_returns, ax=ax)
+
+
+def plot_rolling_vol(returns: pd.Series,
+                     factor_returns: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
+                     rolling_window: int = APPROX_BDAYS_PER_MONTH * 6,
+                     ax: Optional[Axes] = None) -> Axes:
+    """
+    Plots the rolling volatility versus date.
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    y_axis_formatter = FuncFormatter(utils.two_dec_places)
+    ax.yaxis.set_major_formatter(FuncFormatter(y_axis_formatter))
+    ax.set_title('Rolling volatility (6-month)')
+    ax.set_ylabel('Volatility')
+    ax.set_xlabel('')
+
+    rolling_vol_ts = pf.timeseries.rolling_volatility(returns, rolling_window)
+    rolling_vol_ts.plot(alpha=.7, lw=3, color='orangered', ax=ax,
+                        label='Strategy')
+
+    if isinstance(factor_returns, pd.Series):
+        factor_returns = [factor_returns]
+
+    color_index = 1
+    if isinstance(factor_returns, list):
+        bench_means = []
+        colors = sns.color_palette('Greys', len(factor_returns))
+        for bench, color in zip(factor_returns, colors):
+            bench_vol = pf.timeseries.rolling_volatility(bench, rolling_window)
+            bench_vol.plot(alpha=.7, lw=3, color=color, ax=ax,
+                           label=bench.name)
+            color_index += 1
+            bench_means.append(bench_vol.mean())
+
+        for u in bench_means:
+            ax.axhline(u, color=color, linestyle=':', lw=2)
+
+    ax.axhline(rolling_vol_ts.mean(), color='steelblue', linestyle='--', lw=3)
+    ax.axhline(0.0, color='black', linestyle='-', lw=2)
+    ax.legend(loc='best', frameon=True, framealpha=0.5)
+
+    return ax

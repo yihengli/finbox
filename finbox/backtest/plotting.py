@@ -10,7 +10,7 @@ from matplotlib.axes import Axes
 from pyecharts import Grid, HeatMap, Line
 from pyecharts.chart import Chart
 from pyfolio import pos, timeseries
-from pyfolio.utils import APPROX_BDAYS_PER_MONTH, clip_returns_to_benchmark
+from pyfolio.utils import clip_returns_to_benchmark
 
 from . import pyfolio as pf
 from .plottings import _plot_echarts as _pe
@@ -160,6 +160,8 @@ def plot_rolling_betas(returns: pd.Series,
     factor_returns : Union[None, pd.Series, List[pd.Series]], optional
         Daily noncumulative returns of the benchmark factor to which betas are
         computed. Usually a benchmark such as market returns.
+    chart_type : str, optional
+        Plot Engine (the default is 'matplotlib', otherwise 'echarts')
 
     Returns
     -------
@@ -175,30 +177,34 @@ def plot_rolling_betas(returns: pd.Series,
                                   'or `echarts`')
 
 
-def plot_interactive_rolling_vol(returns, factor_returns,
-                                 rolling_window=APPROX_BDAYS_PER_MONTH * 6):
-    rolling_vol_ts = pf.timeseries.rolling_volatility(returns, rolling_window)
-    attr = rolling_vol_ts.index.strftime("%Y-%m-%d")
-    valid_ratio = np.round(rolling_vol_ts.count() / rolling_vol_ts.shape[0], 3)
+def plot_rolling_vol(returns: pd.Series,
+                     factor_returns: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
+                     chart_type: str = 'matplotlib') -> Union[Axes, Chart]:
+    """
+    Plots the rolling volatility versus date.
 
-    line = Line("Rolling Volatility (6-Month)")
-    line.add("Volatility", attr, np.round(rolling_vol_ts, 3).tolist(),
-             is_datazoom_show=True, mark_line=["average"],
-             datazoom_range=[(1 - valid_ratio) * 100, 100],
-             **PlottingConfig.LINE_KWARGS)
-    line._option['color'][0] = PlottingConfig.ORANGE
-    line._option["series"][0]["markLine"]["lineStyle"] = {"width": 2}
+    Parameters
+    ----------
+    returns : pd.Series
+        Daily returns of the strategy, noncumulative.
+    factor_returns : Union[None, pd.Series, List[pd.Series]], optional
+        Daily noncumulative returns of the benchmark factor to which betas are
+        computed. Usually a benchmark such as market returns.
+    chart_type : str, optional
+        Plot Engine (the default is 'matplotlib', otherwise 'echarts')
 
-    if factor_returns is not None:
-        rolling_vol_ts_factor = pf.timeseries.rolling_volatility(
-            factor_returns, rolling_window)
-        line.add("Benchmark Volatiltiy", attr,
-                 np.around(rolling_vol_ts_factor[:len(attr)], 3).tolist(),
-                 mark_line=["average"], **PlottingConfig.BENCH_KWARGS)
-        line._option['color'][1] = 'grey'
-        line._option["series"][1]["markLine"]["lineStyle"] = {"width": 1}
-
-    return line
+    Returns
+    -------
+    Union[mpl.axes.Axes, pyecharts.chart.Chart]
+        Either matplotlib plots or Echarts plot object
+    """
+    if chart_type == 'matplotlib':
+        return _pm.plot_rolling_vol(returns, factor_returns)
+    elif chart_type == 'echarts':
+        return _pe.plot_interactive_rolling_vol(returns, factor_returns)
+    else:
+        raise NotImplementedError('`chart_type` cano only be `matplotlib` '
+                                  'or `echarts`')
 
 
 def plot_interactive_monthly_heatmap(returns):

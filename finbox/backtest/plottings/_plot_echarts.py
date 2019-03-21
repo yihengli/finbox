@@ -330,3 +330,41 @@ def plot_interactive_rolling_betas(returns: pd.Series,
     line._option["series"][0]["markLine"]["lineStyle"] = {"width": 2}
 
     return line
+
+
+def plot_interactive_rolling_vol(returns: pd.Series,
+                                 factor_returns: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
+                                 rolling_window: int = APPROX_BDAYS_PER_MONTH * 6) -> Chart:  # noqa
+    """
+    Plots the rolling volatility versus date.
+    """
+
+    rolling_vol_ts = pf.timeseries.rolling_volatility(returns, rolling_window)
+    attr = rolling_vol_ts.index.strftime("%Y-%m-%d")
+    valid_ratio = np.round(rolling_vol_ts.count() / rolling_vol_ts.shape[0], 3)
+
+    line = Line("Rolling Volatility (6-Month)")
+    line.add("Volatility", attr, np.round(rolling_vol_ts, 3).tolist(),
+             is_datazoom_show=True, mark_line=["average"],
+             datazoom_range=[(1 - valid_ratio) * 100, 100],
+             **PlottingConfig.LINE_KWARGS)
+    line._option['color'][0] = PlottingConfig.ORANGE
+    line._option["series"][0]["markLine"]["lineStyle"] = {"width": 2}
+
+    if isinstance(factor_returns, pd.Series):
+        factor_returns = [factor_returns]
+
+    color_index = 1
+    if isinstance(factor_returns, list):
+        colors = sns.color_palette('Greys', len(factor_returns))
+        for bench, color in zip(factor_returns, colors):
+            bench_vol = pf.timeseries.rolling_volatility(bench, rolling_window)
+            line.add(bench.name, attr,
+                     np.around(bench_vol[:len(attr)], 3).tolist(),
+                     mark_line=["average"], **PlottingConfig.BENCH_KWARGS)
+            line._option['color'][color_index] = 'grey'
+            line._option["series"][color_index]["markLine"]["lineStyle"] = \
+                {"width": 1}
+            color_index += 1
+
+    return line
