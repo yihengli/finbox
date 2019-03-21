@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from matplotlib.axes import Axes
+from matplotlib.ticker import FuncFormatter
+from pyfolio import utils
 
 from .. import pyfolio as pf
 
@@ -80,4 +82,44 @@ def plot_rolling_returns(returns: pd.Series,
     ax.legend(loc='best', frameon=True, framealpha=0.5)
     ax.axhline(1.0, linestyle='--', color='black', lw=2)
 
+    return ax
+
+
+def plot_rolling_sharpes(returns: pd.Series,
+                         factor_returns: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
+                         ax: Optional[Axes] = None) -> Axes:
+    if ax is None:
+        ax = plt.gca()
+
+    y_axis_formatter = FuncFormatter(utils.two_dec_places)
+    ax.yaxis.set_major_formatter(FuncFormatter(y_axis_formatter))
+    ax.set_title('Rolling Sharpe ratio (6-month)')
+    ax.set_ylabel('Sharpe ratio')
+    ax.set_xlabel('')
+
+    sharpe = pf.get_rolling_sharpe(returns)
+    sharpe.name = 'Strategy'
+    sharpe.plot(alpha=.7, lw=3, color='orangered', ax=ax)
+
+    # benchmark handler
+    benchmarks, bench_means = [], []
+    if isinstance(factor_returns, pd.Series):
+        benchmarks = [factor_returns]
+    elif isinstance(factor_returns, list):
+        benchmarks = factor_returns
+
+    if len(benchmarks) > 0:
+        colors = sns.color_palette('Greys', len(benchmarks)).as_hex()
+        for bench, color in zip(benchmarks, colors):
+            bench_sharpe = pf.get_rolling_sharpe(bench)
+            bench_sharpe.plot(alpha=.7, lw=3, color=color, ax=ax)
+            bench_means.append(bench_sharpe.mean())
+
+        for u, color in zip(bench_means, colors):
+            ax.axhline(u, color=color, linestyle=':', lw=2)
+
+    ax.axhline(sharpe.mean(), color='steelblue', linestyle='--', lw=3)
+    ax.axhline(0.0, color='black', linestyle='-', lw=3)
+
+    ax.legend(loc='best', frameon=True, framealpha=0.5)
     return ax

@@ -190,3 +190,42 @@ def plot_interactive_rolling_returns(returns: pd.Series,
         ['In Sample', 'Out Of Sample', 'CI']
 
     return line
+
+
+def plot_interactive_rolling_sharpes(returns: pd.Series,
+                                     factor_returns: Union[None, pd.Series, List[pd.Series]] = None) -> Chart:  # noqa
+    line = Line("Rolling Sharpe Ratio (6 Months)")
+
+    sharpe = pf.get_rolling_sharpe(returns)
+
+    # ratio used to determine the default zoom in view
+    valid_ratio = np.round(sharpe.count() / sharpe.shape[0], 3)
+    attr = sharpe.index.strftime("%Y-%m-%d")
+
+    # benchmark handler
+    benchmarks = []
+    if isinstance(factor_returns, pd.Series):
+        benchmarks = [factor_returns]
+    elif isinstance(factor_returns, list):
+        benchmarks = factor_returns
+
+    color_index = 0
+    if len(benchmarks) > 0:
+        colors = sns.color_palette('Greys', len(benchmarks)).as_hex()
+        for bench, color in zip(benchmarks, colors):
+            bench_sharpe = pf.get_rolling_sharpe(bench)
+            line.add(bench.name, attr, np.round(bench_sharpe, 3).tolist(),
+                     is_datazoom_show=True, mark_line=["average"],
+                     datazoom_range=[(1 - valid_ratio) * 100, 100],
+                     **PlottingConfig.BENCH_KWARGS)
+            line._option['color'][color_index] = color
+            line._option["series"][color_index]["markLine"]["lineStyle"] = \
+                {"width": 1}
+            color_index += 1
+
+    line.add("Strategy", attr, np.round(sharpe, 3).tolist(),
+             mark_line=["average"], **PlottingConfig.LINE_KWARGS)
+    line._option['color'][color_index] = PlottingConfig.ORANGE
+    line._option["series"][color_index]["markLine"]["lineStyle"] = {"width": 2}
+
+    return line

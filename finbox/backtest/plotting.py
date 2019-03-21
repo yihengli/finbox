@@ -1,6 +1,5 @@
 import warnings
 from datetime import date
-from enum import Enum
 from typing import List, Optional, Union
 
 import empyrical as ep
@@ -18,11 +17,6 @@ from .plottings import _plot_echarts as _pe
 from .plottings import _plot_matplotlib as _pm
 
 mpl.style.use('seaborn-paper')
-
-
-class ChartType(Enum):
-    matplotlib = 'matplotlib'
-    echarts = 'echarts'
 
 
 class PlottingConfig:
@@ -74,44 +68,54 @@ def plot_rolling_returns(returns: pd.Series,
          - If a list of benchmarks are given, they will be plotted in order
     cone_std : Optional[pd.DataFrame], optional
         The calculated prediction intervals
+    chart_type : str, optional
+        Plot Engine (the default is 'matplotlib', otherwise 'echarts')
 
     Returns
     -------
     Union[mpl.axes.Axes, pyecharts.chart.Chart]
         Either matplotlib plots or Echarts plot object
     """
-    if ChartType[chart_type] == ChartType['matplotlib']:
+    if chart_type == 'matplotlib':
         return _pm.plot_rolling_returns(returns, factor_returns,
                                         live_start_date, cone_std)
-    elif ChartType[chart_type] == ChartType['echarts']:
+    elif chart_type == 'echarts':
         return _pe.plot_interactive_rolling_returns(returns, factor_returns,
                                                     live_start_date, cone_std)
+    else:
+        raise NotImplementedError('`chart_type` cano only be `matplotlib` '
+                                  'or `echarts`')
 
 
-def plot_interactive_rolling_sharpes(returns,
-                                     factor_returns):
-    line = Line("Rolling Sharpe Ratio (6 Months)")
+def plot_rolling_sharpes(returns: pd.Series,
+                         factor_returns: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
+                         chart_type: str = 'matplotlib') -> Union[Axes, Chart]:
+    """
+    Plots the rolling Sharpe ratio versus date.
 
-    sharpe = pf.get_rolling_sharpe(returns)
-    bench_sharpe = pf.get_rolling_sharpe(factor_returns)
-    valid_ratio = np.round(sharpe.count() / sharpe.shape[0], 3)
+    Parameters
+    ----------
+    returns : pd.Series
+        Daily returns of the strategy, noncumulative.
+    factor_returns : Union[None, pd.Series, List[pd.Series]], optional
+        Daily noncumulative returns of the benchmark factor for which the
+        benchmark rolling Sharpe is computed. Usually a benchmark such as
+        market returns.
+    chart_type : str, optional
+        Plot Engine (the default is 'matplotlib', otherwise 'echarts')
 
-    attr = sharpe.index.strftime("%Y-%m-%d")
-
-    line.add("Benchmark", attr, np.round(bench_sharpe, 3).tolist(),
-             is_datazoom_show=True, mark_line=["average"],
-             datazoom_range=[(1 - valid_ratio) * 100, 100],
-             **PlottingConfig.BENCH_KWARGS)
-    line.add("Strategy", attr, np.round(sharpe, 3).tolist(),
-             mark_line=["average"], **PlottingConfig.LINE_KWARGS)
-
-    line._option['color'][0] = 'grey'
-    line._option['color'][1] = PlottingConfig.ORANGE
-
-    line._option["series"][0]["markLine"]["lineStyle"] = {"width": 1}
-    line._option["series"][1]["markLine"]["lineStyle"] = {"width": 2}
-
-    return line
+    Returns
+    -------
+    Union[mpl.axes.Axes, pyecharts.chart.Chart]
+        Either matplotlib plots or Echarts plot object
+    """
+    if chart_type == 'matplotlib':
+        return _pm.plot_rolling_sharpes(returns, factor_returns)
+    elif chart_type == 'echarts':
+        return _pe.plot_interactive_rolling_sharpes(returns, factor_returns)
+    else:
+        raise NotImplementedError('`chart_type` cano only be `matplotlib` '
+                                  'or `echarts`')
 
 
 def plot_interactive_drawdown_underwater(returns, top=5):
