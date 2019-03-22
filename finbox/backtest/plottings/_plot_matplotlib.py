@@ -269,7 +269,7 @@ def plot_interesting_periods(returns: pd.Series,
             colors = sns.color_palette('Greys', len(benchmark_rets)).as_hex()
 
             for bmark, b, color in zip(bmark_int, benchmark_rets, colors):
-                cum_bech = ep.cum_returns(bmark[name])
+                cum_bech = ep.cum_returns(bmark[name][cum_rets.index])
                 cum_bech.plot(lw=2, color=color, label=b.name,
                               alpha=0.60, ax=axes[i])
 

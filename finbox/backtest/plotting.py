@@ -1,4 +1,4 @@
-from typing import List, Optional, Union, Dict
+from typing import Dict, List, Optional, Union
 
 import matplotlib as mpl
 import pandas as pd
@@ -278,7 +278,7 @@ def plot_exposures_by_assets(positions: pd.DataFrame, chart_type: str = 'matplot
 
 
 def plot_interesting_periods(returns: pd.Series,
-                             factor_returns: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
+                             benchmark_rets: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
                              periods: Optional[List[Dict]] = None,
                              override: bool = False,
                              chart_type: str = 'matplotlib') -> Union[Axes, Chart]:  # noqa
@@ -312,11 +312,11 @@ def plot_interesting_periods(returns: pd.Series,
         will only be used by the report object to decide its allocated heights
     """
     if chart_type == 'matplotlib':
-        return _pm.plot_interesting_periods(returns, factor_returns,
+        return _pm.plot_interesting_periods(returns, benchmark_rets,
                                             periods, override)
     elif chart_type == 'echarts':
         return _pe.plot_interactive_interesting_periods(
-            returns, factor_returns, periods, override)
+            returns, benchmark_rets, periods, override)
     else:
         raise NotImplementedError('`chart_type` can only be `matplotlib` '
                                   'or `echarts`')

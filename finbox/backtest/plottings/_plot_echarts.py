@@ -526,7 +526,7 @@ def plot_interactive_interesting_periods(returns: pd.Series,
                  tooltip_trigger='axis', line_width=2, line_opacity=0.8)
         if benchmark_rets is not None:
             for bmark, b in zip(bmark_int, benchmark_rets):
-                cum_bech = ep.cum_returns(bmark[name])
+                cum_bech = ep.cum_returns(bmark[name][cum_rets.index])
                 line.add(b.name, cum_bech.index.strftime("%Y-%m-%d"),
                          np.round(cum_bech, 3).tolist(),
                          is_splitline_show=False,

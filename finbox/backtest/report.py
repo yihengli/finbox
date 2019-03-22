@@ -1,13 +1,12 @@
 from collections import OrderedDict
-from typing import Dict, Optional, List
+from typing import Dict, List, Optional, Union
 
 import backtrader as bt
+import matplotlib.pyplot as plt
 import pandas as pd
 from IPython.core.display import display
-from pytz import UTC
 
 from . import plotting, pyfolio
-from ..data.equity import get_history
 
 
 class ReportBuilder(object):
@@ -152,6 +151,7 @@ class ReportBuilder(object):
         $(window).on('resize', function(){{
           if(chartEXPBA != null && chartEXPBA != undefined){{chartEXPBA.resize();}} }});
       </script>
+      <!--
       <div id="gross_leverages" style="width: 100%;height:400px;"></div>
       <script type="text/javascript">
         var chartGL = echarts.init(document.getElementById('gross_leverages'));
@@ -159,7 +159,7 @@ class ReportBuilder(object):
         chartGL.setOption(optionGL);
         $(window).on('resize', function(){{
           if(chartGL != null && chartGL != undefined){{chartGL.resize();}} }});
-      </script>
+      </script> -->
 
     {interesting_periods_section}
   </div>
@@ -169,7 +169,7 @@ class ReportBuilder(object):
 
     def __init__(self,
                  strat: bt.strategy.Strategy,
-                 benchmark_rets: Optional[pd.Series] = None,
+                 benchmark_rets: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
                  live_start_date: Optional[str] = None,
                  report_name: str = 'Report',
                  custom_interesting_periods: Optional[List[OrderedDict]] = None,  # noqa
@@ -179,6 +179,11 @@ class ReportBuilder(object):
                  transactions: Optional[pd.DataFrame] = None,
                  gross_lev: Optional[pd.DataFrame] = None,
                  navbar_settings: Optional[Dict] = None):
+
+        def _check_and_fix_tz(bench: pd.Series) -> pd.Series:
+            if bench.index.tzinfo is None or bench.index.tzinfo.utcoffset(bench.index) is None:  # noqa
+                bench.index = bench.index.tz_localize('UTC')
+            return bench
 
         # Handle Backtrader Strategy Object or directly use return data..
         if strat is not None:
@@ -190,21 +195,19 @@ class ReportBuilder(object):
                 raise Exception("Either a `strat` object or `returns, "
                                 "positions, transactions` should be provided")
 
-        # Handle benchmark related data
-        if benchmark_rets is None:
-            fromdate = returns.index.min().strftime('%Y-%m-%d')
-            todate = returns.index.max().strftime('%Y-%m-%d')
-            benchmark_rets = get_history('SPY', fromdate=fromdate,
-                                         todate=todate, set_index=True)['Adj Close'].pct_change()  # noqa
-            benchmark_rets.name = 'SPY'
-
-        if not isinstance(benchmark_rets.index, type(UTC)):
-            benchmark_rets.index = benchmark_rets.index.tz_localize('UTC')
-
-        benchmark_rets = pd.merge(pd.DataFrame(returns),
-                                  pd.DataFrame(benchmark_rets),
-                                  left_index=True, right_index=True,
-                                  how="left").fillna(0).iloc[:, 1]
+        if isinstance(benchmark_rets, pd.Series):
+            benchmark_rets = _check_and_fix_tz(benchmark_rets)
+            benchmark_rets = pd.merge(pd.DataFrame(returns),
+                                      pd.DataFrame(benchmark_rets),
+                                      left_index=True, right_index=True,
+                                      how="left").fillna(0).iloc[:, 1]
+        elif isinstance(benchmark_rets, list):
+            for bench in benchmark_rets:
+                bench = _check_and_fix_tz(bench)
+                bench = pd.merge(pd.DataFrame(returns),
+                                 pd.DataFrame(bench),
+                                 left_index=True, right_index=True,
+                                 how="left").fillna(0).iloc[:, 1]
 
         # Define Attributes
         self.returns = returns
@@ -230,35 +233,83 @@ class ReportBuilder(object):
             if item not in navbar_settings.keys():
                 self.navbar_settings[item] = default
 
-    def build_report(self, dest=None):
+    def build_report(self, dest: Optional[str] = None,
+                     chart_type: str = 'echarts') -> None:
         jupyter = True if dest is None else False
+
+        if dest is not None and chart_type != 'echarts':
+            raise NotImplementedError('Currently report only supports `echarts` engine when outputting reports as HTML')  # noqa
 
         table = self.get_performance_table(jupyter=jupyter)
         table_drawdowns = self.get_drawdown_table(jupyter=jupyter)
 
-        if jupyter:
-            display(self.get_interactive_rolling_returns(jupyter=jupyter))
-            display(self.get_interactive_rolling_vol(jupyter=jupyter))
-            display(self.get_interactive_rolling_sharpes(jupyter=jupyter))
-            # display(self.get_interactive_rolling_betas(jupyter=jupyter))
-            display(self.get_interactive_monthly_heatmap(jupyter=jupyter))
-            display(self.get_interactive_drawdown_and_underwater(jupyter))
-            display(self.get_interactive_exposures(jupyter=jupyter))
-            display(self.get_interactive_exposures_by_asset(jupyter))
-            display(self.get_interactive_gross_leverage(jupyter=jupyter))
-            display(self.get_interactive_interesting_periods(jupyter))
+        if jupyter and chart_type == 'echarts':
+            display(self.get_rolling_returns(jupyter=jupyter))
+            display(self.get_rolling_vol(jupyter=jupyter))
+            display(self.get_rolling_sharpes(jupyter=jupyter))
+            try:
+                display(self.get_interactive_rolling_betas(jupyter=jupyter))
+            except Exception:
+                print('Benchmark returns are needed for beta returns')
+            display(self.get_monthly_heatmap(jupyter=jupyter))
+            display(self.get_drawdown_and_underwater(jupyter))
+            display(self.get_exposures(jupyter=jupyter))
+            display(self.get_exposures_by_asset(jupyter))
+            # display(self.get_interactive_gross_leverage(jupyter=jupyter))
+            display(self.get_interesting_periods(jupyter))
+        elif jupyter and chart_type == 'matplotlib':
+            _ = self.get_rolling_returns(jupyter=jupyter,
+                                         chart_type=chart_type)
+            plt.show()
 
+            _ = self.get_rolling_vol(jupyter=jupyter,
+                                     chart_type=chart_type)
+            plt.show()
+
+            _ = self.get_rolling_sharpes(jupyter=jupyter,
+                                         chart_type=chart_type)
+            plt.show()
+
+            try:
+                _ = self.get_rolling_betas(jupyter=jupyter,
+                                           chart_type=chart_type)
+                plt.show()
+            except Exception:
+                print('Benchmark returns are needed for beta returns')
+
+            _ = self.get_monthly_heatmap(jupyter=jupyter,
+                                         chart_type=chart_type)
+            plt.show()
+
+            _ = self.get_drawdown_and_underwater(jupyter=jupyter,
+                                                 chart_type=chart_type)
+            plt.show()
+
+            _ = self.get_exposures(jupyter=jupyter,
+                                   chart_type=chart_type)
+            plt.show()
+
+            _ = self.get_exposures_by_asset(jupyter=jupyter,
+                                            chart_type=chart_type)
+            plt.show()
+
+            _ = self.get_interesting_periods(jupyter=jupyter,
+                                             chart_type=chart_type)
+            plt.show()
         if dest is not None:
-            rct_f, rct_o = self.get_interactive_rolling_returns(
+            rct_f, rct_o = self.get_rolling_returns(
                 jupyter=jupyter)
-            rvol_o = self.get_interactive_rolling_vol(jupyter=jupyter)
-            rbeta_o = self.get_interactive_rolling_betas(jupyter=jupyter)
-            rcs_o = self.get_interactive_rolling_sharpes(jupyter=jupyter)
-            mrh_o = self.get_interactive_monthly_heatmap(jupyter=jupyter)
-            dau_o = self.get_interactive_drawdown_and_underwater(jupyter)
-            exp_o = self.get_interactive_exposures(jupyter=jupyter)
-            expba_o = self.get_interactive_exposures_by_asset(jupyter=jupyter)
-            gl_o = self.get_interactive_gross_leverage(jupyter=jupyter)
+            rvol_o = self.get_rolling_vol(jupyter=jupyter)
+            try:
+                rbeta_o = self.get_rolling_betas(jupyter=jupyter)
+            except Exception:
+                rbeta_o = ''
+            rcs_o = self.get_rolling_sharpes(jupyter=jupyter)
+            mrh_o = self.get_monthly_heatmap(jupyter=jupyter)
+            dau_o = self.get_drawdown_and_underwater(jupyter)
+            exp_o = self.get_exposures(jupyter=jupyter)
+            expba_o = self.get_exposures_by_asset(jupyter=jupyter)
+            # gl_o = self.get_gross_leverage(jupyter=jupyter)
 
             interesting_periods = self.get_interesting_periods_section()
 
@@ -281,11 +332,12 @@ class ReportBuilder(object):
                     dau_option=dau_o,
                     exp_option=exp_o,
                     expba_option=expba_o,
-                    gl_option=gl_o,
+                    gl_option='',
                     interesting_periods_section=interesting_periods))
 
     def get_performance_table(self, jupyter=True):
         return pyfolio.show_perf_stats(returns=self.returns,
+                                       factor_returns=self.benchmark_rets,
                                        positions=self.positions,
                                        transactions=self.transactions,
                                        live_start_date=self.live_start_date,
@@ -295,12 +347,13 @@ class ReportBuilder(object):
         return pyfolio.show_worst_drawdown_table(returns=self.returns,
                                                  jupyter=jupyter, pandas=False)
 
-    def get_interactive_rolling_returns(self, jupyter=True):
-        plot = plotting.plot_interactive_rolling_returns(
+    def get_rolling_returns(self, jupyter=True, chart_type='echarts'):
+        plot = plotting.plot_rolling_returns(
             returns=self.returns,
             factor_returns=self.benchmark_rets,
             live_start_date=self.live_start_date,
-            cone_std=[1, 1.5, 2]
+            cone_std=[1, 1.5, 2],
+            chart_type=chart_type
         )
 
         if jupyter:
@@ -329,82 +382,82 @@ class ReportBuilder(object):
         option_str = html_text[option_start + len(chart_id) + 3:option_end]
         return option_str
 
-    def get_interactive_rolling_vol(self, jupyter=True):
-        plot = plotting.plot_interactive_rolling_vol(
-            returns=self.returns, factor_returns=self.benchmark_rets)
+    def get_rolling_vol(self, jupyter=True, chart_type='echarts'):
+        plot = plotting.plot_rolling_vol(
+            returns=self.returns, factor_returns=self.benchmark_rets,
+            chart_type=chart_type)
 
         if jupyter:
             return plot
         else:
             return self._echart_option_extract(plot)
 
-    def get_interactive_rolling_betas(self, jupyter=True):
-        plot = plotting.plot_interactive_rolling_betas(
-            returns=self.returns, factor_returns=self.benchmark_rets)
+    def get_rolling_betas(self, jupyter=True, chart_type='echarts'):
+        plot = plotting.plot_rolling_betas(
+            returns=self.returns, factor_returns=self.benchmark_rets,
+            chart_type=chart_type)
 
         if jupyter:
             return plot
         else:
             return self._echart_option_extract(plot)
 
-    def get_interactive_rolling_sharpes(self, jupyter=True):
-        plot = plotting.plot_interactive_rolling_sharpes(
-            returns=self.returns, factor_returns=self.benchmark_rets)
+    def get_rolling_sharpes(self, jupyter=True, chart_type='echarts'):
+        plot = plotting.plot_rolling_sharpes(
+            returns=self.returns, factor_returns=self.benchmark_rets,
+            chart_type=chart_type)
 
         if jupyter:
             return plot
         else:
             return self._echart_option_extract(plot)
 
-    def get_interactive_monthly_heatmap(self, jupyter=True):
-        plot = plotting.plot_interactive_monthly_heatmap(returns=self.returns)
+    def get_monthly_heatmap(self, jupyter=True, chart_type='echarts'):
+        plot = plotting.plot_monthly_heatmap(
+            returns=self.returns, chart_type=chart_type)
 
         if jupyter:
             return plot
         else:
             return self._echart_option_extract(plot)
 
-    def get_interactive_drawdown_and_underwater(self, jupyter=True):
-        plot = plotting.plot_interactive_drawdown_underwater(
-            returns=self.returns)
+    def get_drawdown_and_underwater(self, jupyter=True, chart_type='echarts'):
+        plot = plotting.plot_drawdown_underwater(
+            returns=self.returns, chart_type=chart_type)
 
         if jupyter:
             return plot
         else:
             return self._echart_option_extract(plot)
 
-    def get_interactive_exposures(self, jupyter=True):
+    def get_exposures(self, jupyter=True, chart_type='echarts'):
 
-        plot = plotting.plot_interactive_exposures(
-            returns=self.returns, positions=self.positions)
-
-        if jupyter:
-            return plot
-        else:
-            return self._echart_option_extract(plot)
-
-    def get_interactive_exposures_by_asset(self, jupyter=True):
-        plot = plotting.plot_interactive_exposures_by_asset(
-            positions=self.positions)
+        plot = plotting.plot_exposures(
+            returns=self.returns, positions=self.positions,
+            chart_type=chart_type)
 
         if jupyter:
             return plot
         else:
             return self._echart_option_extract(plot)
 
-    def get_interactive_gross_leverage(self, jupyter=True):
-        plot = plotting.plot_interactive_gross_leverage(
-            positions=self.positions)
+    def get_exposures_by_asset(self, jupyter=True, chart_type='echarts'):
+        plot = plotting.plot_exposures_by_assets(
+            positions=self.positions, chart_type=chart_type)
 
         if jupyter:
             return plot
         else:
             return self._echart_option_extract(plot)
 
-    def get_interactive_interesting_periods(self, jupyter=True):
-        plot = plotting.plot_interactive_interesting_periods(
+    def get_gross_leverage(self, jupyter=True, chart_type='echarts'):
+        pass
+
+    def get_interesting_periods(self, jupyter=True, chart_type='echarts'):
+        plot = plotting.plot_interesting_periods(
             returns=self.returns, benchmark_rets=self.benchmark_rets,
-            periods=self.periods, override=self.override)
+            periods=self.periods, override=self.override,
+            chart_type=chart_type)
 
         if jupyter:
             if plot is None:
@@ -428,7 +481,7 @@ class ReportBuilder(object):
         if(chartIPA != null && chartIPA != undefined){{chartIPA.resize();}} }});
     </script>
 """  # noqa E501
-        res = self.get_interactive_interesting_periods(jupyter=False)
+        res = self.get_interesting_periods(jupyter=False, chart_type='echarts')
         if res is None:
             return ""
         else:
