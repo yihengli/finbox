@@ -1,18 +1,18 @@
 import warnings
-from typing import Dict, List, Optional, Tuple, Union
 from datetime import date
+from typing import Dict, List, Optional, Tuple, Union
 
 import empyrical as ep
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from pyecharts import Grid, Line, HeatMap
+from pyecharts import Grid, HeatMap, Line
 from pyecharts.chart import Chart
+from pyfolio import pos, timeseries
 from pyfolio.utils import APPROX_BDAYS_PER_MONTH
 
 from .. import pyfolio as pf
 from ._plot_meta import PlottingConfig
-from pyfolio import pos
 
 
 class Number:
@@ -31,28 +31,6 @@ def plot_interactive_rolling_returns(returns: pd.Series,
 
     Additionally, a non-parametric cone plot may be added to the
     out-of-sample returns region.
-
-    Parameters
-    ----------
-    returns : pd.Series
-        Daily returns of the strategy, noncumulative.
-         - See full explanation in tears.create_full_tear_sheet.
-    factor_returns : pd.Series, optional
-        Daily noncumulative returns of the benchmark factor to which betas are
-        computed. Usually a benchmark such as market returns.
-         - This is in the same style as returns.
-    live_start_date : datetime, optional
-        The date when the strategy began live trading, after
-        its backtest period. This date should be normalized.
-    cone_std : float, or tuple, optional
-        If float, The standard deviation to use for the cone plots.
-        If tuple, Tuple of standard deviation values to use for the cone plots
-         - See timeseries.forecast_cone_bounds for more details.
-
-    Returns
-    -------
-    pyecharts.chart.Chart
-        The axes that were plotted on.
     """
 
     def tooltip_format(params):
@@ -199,6 +177,9 @@ def plot_interactive_rolling_returns(returns: pd.Series,
 
 def plot_interactive_rolling_sharpes(returns: pd.Series,
                                      factor_returns: Union[None, pd.Series, List[pd.Series]] = None) -> Chart:  # noqa
+    """
+    Plots the rolling Sharpe ratio versus date.
+    """
     line = Line("Rolling Sharpe Ratio (6 Months)")
 
     sharpe = pf.get_rolling_sharpe(returns)
@@ -372,7 +353,7 @@ def plot_interactive_rolling_vol(returns: pd.Series,
     return line
 
 
-def plot_interactive_monthly_heatmap(returns):
+def plot_interactive_monthly_heatmap(returns: pd.Series) -> Chart:
     """
     Plots a heatmap of returns by month.
     """
@@ -445,7 +426,7 @@ def plot_interactive_exposures(returns: pd.Series,
     return line
 
 
-def plot_interactive_exposures_by_asset(positions):
+def plot_interactive_exposures_by_asset(positions: pd.DataFrame) -> Chart:
     """
     plots the exposures of the held positions of all time.
     """
@@ -463,3 +444,107 @@ def plot_interactive_exposures_by_asset(positions):
                  datazoom_range=[0, 100], tooltip_trigger="axis")
 
     return line
+
+
+def plot_interactive_gross_leverage(positions: pd.DataFrame) -> Chart:
+    """TODO: NotImplementedYet"""
+
+    gl = timeseries.gross_lev(positions)
+    line = Line("Gross Leverage")
+
+    line.add("Gross Leverage", gl.index.strftime("%Y-%m-%d"),
+             np.round(gl, 3).tolist(), is_datazoom_show=True,
+             mark_line=["average"], datazoom_range=[0, 100],
+             **PlottingConfig.LINE_KWARGS)
+
+    line._option['color'][0] = PlottingConfig.GREEN
+    line._option["series"][0]["markLine"]["lineStyle"] = {"width": 2}
+
+    return line
+
+
+def plot_interactive_interesting_periods(returns: pd.Series,
+                                         benchmark_rets: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
+                                         periods: Optional[List[Dict]] = None,
+                                         override: bool = False) -> Tuple[Chart, int]:  # noqa
+    """
+    plots the exposures of positions of all time.
+    """
+    rets_interesting = pf.extract_interesting_date_ranges(
+        returns, periods, override)
+
+    if not rets_interesting:
+        warnings.warn('Passed returns do not overlap with any'
+                      'interesting times.', UserWarning)
+        return
+
+    # returns = clip_returns_to_benchmark(returns, benchmark_rets)
+
+    if isinstance(benchmark_rets, pd.Series):
+        benchmark_rets = [benchmark_rets]
+
+    if isinstance(benchmark_rets, list):
+        bmark_int = []
+        for bmark in benchmark_rets:
+            bmark_int.append(
+                pf.extract_interesting_date_ranges(bmark, periods, override))
+
+    num_plots = len(rets_interesting)
+    num_rows = int((num_plots + 1) / 2.0)
+    height = num_rows*180
+
+    grid = Grid(height=height)
+
+    up_maxi = 3
+    down_maxi = 3
+    gap = 2
+
+    margin_step = np.round(((100 - up_maxi - down_maxi - gap * (num_rows - 1))
+                            / num_rows), 1)
+
+    t_margins = [up_maxi + i * (margin_step + gap) for i in range(num_rows)]
+    b_margins = [down_maxi + i * (margin_step + gap)
+                 for i in range(num_rows)][::-1]
+
+    for i, (name, rets_period) in enumerate(rets_interesting.items()):
+        top_margin = t_margins[i // 2]
+        bottom_margin = b_margins[i // 2]
+        left_margin = 55 if i % 2 == 1 else 5
+        right_margin = 0 if i % 2 == 1 else 55
+
+        if i != 0:
+            is_legend_show = False
+        else:
+            is_legend_show = True
+
+        line = Line(name, title_top="{}%".format(top_margin),
+                    title_pos="{}%".format(left_margin))
+        cum_rets = ep.cum_returns(rets_period)
+        line.add("Algo", cum_rets.index.strftime("%Y-%m-%d"),
+                 np.round(cum_rets, 3).tolist(), is_splitline_show=False,
+                 is_legend_show=is_legend_show, is_symbol_show=False,
+                 tooltip_trigger='axis', line_width=2, line_opacity=0.8)
+        if benchmark_rets is not None:
+            for bmark, b in zip(bmark_int, benchmark_rets):
+                cum_bech = ep.cum_returns(bmark[name])
+                line.add(b.name, cum_bech.index.strftime("%Y-%m-%d"),
+                         np.round(cum_bech, 3).tolist(),
+                         is_splitline_show=False,
+                         is_legend_show=is_legend_show, is_symbol_show=False,
+                         tooltip_trigger='axis', line_opacity=0.8)
+
+        grid.add(line,
+                 grid_top="{}%".format(top_margin + gap),
+                 grid_bottom="{}%".format(bottom_margin),
+                 grid_left="{}%".format(left_margin),
+                 grid_right="{}%".format(right_margin))
+
+    grid._option["color"][0] = PlottingConfig.GREEN
+    grid._option["color"][1] = "grey"
+
+    if benchmark_rets is not None:
+        colors = sns.color_palette('Greys', len(benchmark_rets)).as_hex()
+        for i in range(1, len(benchmark_rets) + 1):
+            grid._option["color"][i] = colors[i-1]
+
+    return grid, height

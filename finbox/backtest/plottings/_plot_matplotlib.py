@@ -1,12 +1,13 @@
 import warnings
-from typing import List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 from matplotlib.axes import Axes
 from matplotlib.ticker import FuncFormatter
-from pyfolio import plotting, utils, pos
+import empyrical as ep
+from pyfolio import plotting, pos, utils
 from pyfolio.utils import APPROX_BDAYS_PER_MONTH
 
 from .. import pyfolio as pf
@@ -19,36 +20,7 @@ def plot_rolling_returns(returns: pd.Series,
                          ax: Optional[Axes] = None) -> Axes:  # noqa
     """
     Plots cumulative rolling returns versus some benchmarks'.
-
-    Backtest returns are in green, and out-of-sample (live trading)
-    returns are in red.
-
-    Additionally, a non-parametric cone plot may be added to the
-    out-of-sample returns region.
-
-    Parameters
-    ----------
-    returns : pd.Series
-        Daily returns of the strategy, noncumulative.
-         - See full explanation in tears.create_full_tear_sheet.
-    factor_returns : pd.Series, optional
-        Daily noncumulative returns of the benchmark factor to which betas are
-        computed. Usually a benchmark such as market returns.
-         - This is in the same style as returns.
-    live_start_date : datetime, optional
-        The date when the strategy began live trading, after
-        its backtest period. This date should be normalized.
-    cone_std : float, or tuple, optional
-        If float, The standard deviation to use for the cone plots.
-        If tuple, Tuple of standard deviation values to use for the cone plots
-         - See timeseries.forecast_cone_bounds for more details.
-
-    Returns
-    -------
-    matplotlib.axes.Axes
-        The axes that were plotted on.
     """
-
     metrics = pf.get_rolling_returns(returns, factor_returns=factor_returns,
                                      live_start_date=live_start_date,
                                      cone_std=cone_std)
@@ -90,6 +62,9 @@ def plot_rolling_returns(returns: pd.Series,
 def plot_rolling_sharpes(returns: pd.Series,
                          factor_returns: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
                          ax: Optional[Axes] = None) -> Axes:
+    """
+    Plots the rolling Sharpe ratio versus date.
+    """
     if ax is None:
         ax = plt.gca()
 
@@ -142,7 +117,9 @@ def plot_drawdown_underwater(returns: pd.Series, top: int = 5,
         plotting.plot_drawdown_periods(returns, top, axes[0])
         plotting.plot_drawdown_underwater(returns, axes[1])
 
-    fig.tight_layout()
+    if 'fig' in locals():
+        fig.tight_layout()
+
     return axes
 
 
@@ -246,3 +223,66 @@ def plot_exposures_by_assets(positions: pd.DataFrame,
     ax.set_ylabel('Exposure by holding')
     ax.set_xlabel('')
     return ax
+
+
+def plot_interesting_periods(returns: pd.Series,
+                             benchmark_rets: Union[None, pd.Series, List[pd.Series]] = None,  # noqa
+                             periods: Optional[List[Dict]] = None,
+                             override: bool = False,
+                             axes: Optional[List[Axes]] = None) -> Tuple[Axes, None]:  # noqa
+    """
+    Plot out the cumulative returns over several selected periods such as 08
+    financial crisis.
+    """
+    rets_interesting = pf.extract_interesting_date_ranges(
+        returns, periods, override)
+
+    if not rets_interesting:
+        warnings.warn('Passed returns do not overlap with any'
+                      'interesting times.', UserWarning)
+        return
+
+    if isinstance(benchmark_rets, pd.Series):
+        benchmark_rets = [benchmark_rets]
+
+    if isinstance(benchmark_rets, list):
+        bmark_int = []
+        for bmark in benchmark_rets:
+            bmark_int.append(
+                pf.extract_interesting_date_ranges(bmark, periods, override))
+
+    num_plots = len(rets_interesting)
+    num_rows = int((num_plots + 1) / 2.0)
+    height = num_rows*3
+
+    if axes is None:
+        fig, axes = plt.subplots(num_rows, 2, figsize=(10, height))
+        axes = axes.flatten()
+
+    for i, (name, ret_period) in enumerate(rets_interesting.items()):
+
+        cum_rets = ep.cum_returns(ret_period)
+        cum_rets.plot(lw=3, color='forestgreen', alpha=0.6, label='Algo',
+                      ax=axes[i])
+
+        if benchmark_rets is not None:
+            colors = sns.color_palette('Greys', len(benchmark_rets)).as_hex()
+
+            for bmark, b, color in zip(bmark_int, benchmark_rets, colors):
+                cum_bech = ep.cum_returns(bmark[name])
+                cum_bech.plot(lw=2, color=color, label=b.name,
+                              alpha=0.60, ax=axes[i])
+
+        axes[i].legend(loc='best', frameon=True, framealpha=0.5)
+        axes[i].set_title(name, fontweight=700)
+        axes[i].set_ylabel('Returns')
+        axes[i].set_xlabel('')
+        axes[i].axhline(0.0, linestyle='--', color='black', lw=1)
+
+    if num_plots < len(axes):
+        axes[-1].set_visible(False)
+
+    if 'fig' in locals():
+        fig.tight_layout()
+
+    return axes
