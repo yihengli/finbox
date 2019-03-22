@@ -4,10 +4,10 @@ This is a Python client for a set of Finance related tools.
 
 ## How to Install
 
-This project is very new and hasn't been pushed to `PyPI` yet. For any one who is willing to use, please directly install from github:
+This project has been pushed to `PyPI` yet.
 
 ```
-pip install -e git+https://github.com/yihengli/valpy#egg=valpy
+pip install finbox
 ```
 
 A more detailed doc is also under development.
@@ -26,7 +26,7 @@ The goal is to easily access finance data as pandas dataframe from various data 
 ### Yahoo
 
 ```python
-from valpy.data.equity import get_history
+from finbox.data.equity import get_history
 
 spy = get_history('SPY', todate='2019-01-01', fromdate='2018-01-01', 
                   freq='d', api_mode='yahoo')
@@ -42,7 +42,7 @@ spy = get_history('SPY', todate='2019-01-01', fromdate='2018-01-01',
 For the detailed information of backend API, please check https://docs.orats.io/
 
 ```python
-from valpy.data.options import OratsData
+from finbox.data.options import OratsData
 
 od = OratsData(token='YOUR_TOKEN_FROM_ORATS')
 df = od.get_history_data(name='strikes', ticker='SPY', fromdate='2019-01-01',
