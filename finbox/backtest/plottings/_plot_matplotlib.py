@@ -7,7 +7,7 @@ import seaborn as sns
 from matplotlib.axes import Axes
 from matplotlib.ticker import FuncFormatter
 import empyrical as ep
-from pyfolio import plotting, pos, utils
+from pyfolio import plotting, pos, utils, timeseries
 from pyfolio.utils import APPROX_BDAYS_PER_MONTH
 
 from .. import pyfolio as pf
@@ -89,7 +89,7 @@ def plot_rolling_sharpes(returns: pd.Series,
         colors = sns.color_palette('Greys', len(benchmarks)).as_hex()
         for bench, color in zip(benchmarks, colors):
             bench_sharpe = pf.get_rolling_sharpe(bench)
-            bench_sharpe.plot(alpha=.7, lw=3, color=color, ax=ax)
+            bench_sharpe.plot(alpha=.7, lw=2, color=color, ax=ax)
             bench_means.append(bench_sharpe.mean())
 
         for u, color in zip(bench_means, colors):
@@ -134,7 +134,29 @@ def plot_rolling_betas(returns: pd.Series, factor_returns: pd.Series,
     elif isinstance(factor_returns, list):
         factor_returns = factor_returns[0]
 
-    return plotting.plot_rolling_beta(returns, factor_returns, ax=ax)
+    if ax is None:
+        ax = plt.gca()
+
+    y_axis_formatter = FuncFormatter(utils.two_dec_places)
+    ax.yaxis.set_major_formatter(FuncFormatter(y_axis_formatter))
+
+    ax.set_title("Rolling portfolio beta to " + str(factor_returns.name))
+    ax.set_ylabel('Beta')
+    rb_1 = timeseries.rolling_beta(
+        returns, factor_returns, rolling_window=APPROX_BDAYS_PER_MONTH * 6)
+    rb_1.plot(color='steelblue', lw=3, alpha=0.6, ax=ax)
+    rb_2 = timeseries.rolling_beta(
+        returns, factor_returns, rolling_window=APPROX_BDAYS_PER_MONTH * 12)
+    rb_2.plot(color='grey', lw=3, alpha=0.4, ax=ax)
+    ax.axhline(rb_1.mean(), color='steelblue', linestyle='--', lw=3)
+    ax.axhline(0.0, color='black', linestyle='-', lw=2)
+
+    ax.set_xlabel('')
+    ax.legend(['6-mo',
+               '12-mo'],
+              loc='best', frameon=True, framealpha=0.5)
+
+    return ax
 
 
 def plot_rolling_vol(returns: pd.Series,

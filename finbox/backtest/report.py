@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from typing import Dict, List, Optional, Union
+import warnings
 
 import backtrader as bt
 import matplotlib.pyplot as plt
@@ -185,6 +186,11 @@ class ReportBuilder(object):
                 bench.index = bench.index.tz_localize('UTC')
             return bench
 
+        def _validate_returns(ret: pd.Series) -> None:
+            if len(ret[ret.isnull()]) > 0:
+                warnings.warn('%s series contains nan values' % ret.name,
+                              UserWarning)
+
         # Handle Backtrader Strategy Object or directly use return data..
         if strat is not None:
             pyfoliozer = strat.analyzers.getbyname('pyfolio')
@@ -196,6 +202,7 @@ class ReportBuilder(object):
                                 "positions, transactions` should be provided")
 
         if isinstance(benchmark_rets, pd.Series):
+            _validate_returns(benchmark_rets)
             benchmark_rets = _check_and_fix_tz(benchmark_rets)
             benchmark_rets = pd.merge(pd.DataFrame(returns),
                                       pd.DataFrame(benchmark_rets),
@@ -203,6 +210,7 @@ class ReportBuilder(object):
                                       how="left").fillna(0).iloc[:, 1]
         elif isinstance(benchmark_rets, list):
             for bench in benchmark_rets:
+                _validate_returns(bench)
                 bench = _check_and_fix_tz(bench)
                 bench = pd.merge(pd.DataFrame(returns),
                                  pd.DataFrame(bench),
@@ -210,6 +218,7 @@ class ReportBuilder(object):
                                  how="left").fillna(0).iloc[:, 1]
 
         # Define Attributes
+        _validate_returns(returns)
         self.returns = returns
         self.positions = positions
         self.transactions = transactions

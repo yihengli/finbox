@@ -186,7 +186,6 @@ def plot_interactive_rolling_sharpes(returns: pd.Series,
 
     # ratio used to determine the default zoom in view
     valid_ratio = np.round(sharpe.count() / sharpe.shape[0], 3)
-    attr = sharpe.index.strftime("%Y-%m-%d")
 
     # benchmark handler
     benchmarks = []
@@ -200,6 +199,7 @@ def plot_interactive_rolling_sharpes(returns: pd.Series,
         colors = sns.color_palette('Greys', len(benchmarks)).as_hex()
         for bench, color in zip(benchmarks, colors):
             bench_sharpe = pf.get_rolling_sharpe(bench)
+            attr = bench_sharpe.index.strftime("%Y-%m-%d")
             line.add(bench.name, attr, np.round(bench_sharpe, 3).tolist(),
                      is_datazoom_show=True, mark_line=["average"],
                      datazoom_range=[(1 - valid_ratio) * 100, 100],
@@ -209,6 +209,7 @@ def plot_interactive_rolling_sharpes(returns: pd.Series,
                 {"width": 1}
             color_index += 1
 
+    attr = sharpe.index.strftime("%Y-%m-%d")
     line.add("Strategy", attr, np.round(sharpe, 3).tolist(),
              mark_line=["average"], **PlottingConfig.LINE_KWARGS)
     line._option['color'][color_index] = PlottingConfig.ORANGE
@@ -236,7 +237,7 @@ def plot_interactive_drawdown_underwater(returns: pd.Series, top: int = 5) -> Ch
     # Plot out the returns
     line.add("Cumulative Returns", attr, np.round(df_cum_rets, 3).tolist(),
              line_color='#fff', is_datazoom_show=True, datazoom_range=[0, 100],
-             yaxis_min=0.7, datazoom_xaxis_index=[0, 1],
+             yaxis_min=np.min(df_cum_rets), datazoom_xaxis_index=[0, 1],
              **PlottingConfig.BENCH_KWARGS)
 
     line._option["color"][0] = PlottingConfig.ORANGE
@@ -342,6 +343,7 @@ def plot_interactive_rolling_vol(returns: pd.Series,
         colors = sns.color_palette('Greys', len(factor_returns))
         for bench, color in zip(factor_returns, colors):
             bench_vol = pf.timeseries.rolling_volatility(bench, rolling_window)
+            attr = bench_vol.index.strftime("%Y-%m-%d")
             line.add(bench.name, attr,
                      np.around(bench_vol[:len(attr)], 3).tolist(),
                      mark_line=["average"], **PlottingConfig.BENCH_KWARGS)

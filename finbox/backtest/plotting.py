@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional, Union
+import warnings
 
 import matplotlib as mpl
 import pandas as pd
@@ -312,8 +313,10 @@ def plot_interesting_periods(returns: pd.Series,
         will only be used by the report object to decide its allocated heights
     """
     if chart_type == 'matplotlib':
-        return _pm.plot_interesting_periods(returns, benchmark_rets,
-                                            periods, override)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            return _pm.plot_interesting_periods(returns, benchmark_rets,
+                                                periods, override)
     elif chart_type == 'echarts':
         return _pe.plot_interactive_interesting_periods(
             returns, benchmark_rets, periods, override)

@@ -247,11 +247,11 @@ def show_perf_stats(returns: pd.Series,
     perf_stats_benchmarks = []
     if factor_returns is not None and isinstance(factor_returns, list):
         for factor in factor_returns:
-            perf_stats_benchmarks.append(perf_func(factor))
+            perf_stats_benchmarks.append(perf_func(factor, factor_returns[0]))
             perf_stats_benchmarks[-1].name = factor.name
         factor_returns = factor_returns[0]
     elif factor_returns is not None and isinstance(factor_returns, pd.Series):
-        perf_stats_benchmarks.append(perf_func(factor_returns))
+        perf_stats_benchmarks.append(perf_func(factor_returns, factor_returns))
         perf_stats_benchmarks[-1].name = factor_returns.name
 
     # Strategy data handler
